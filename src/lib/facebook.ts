@@ -1,5 +1,5 @@
 import { FacebookAccount, FacebookCampaign, FacebookAdSet, FacebookAd } from '@/types';
-import { FACEBOOK_OAUTH_CONFIG } from '@/config/facebook';
+import { FACEBOOK_OAUTH_CONFIG, FACEBOOK_LOGIN_CONFIG } from '@/config/facebook';
 
 // Facebook Graph API base URL
 const FACEBOOK_API_BASE = 'https://graph.facebook.com/v19.0';
@@ -418,7 +418,7 @@ export function createFacebookClient(accessToken: string): FacebookApiClient {
   return new FacebookApiClient(accessToken);
 }
 
-// Generate Facebook OAuth URL
+// Generate Facebook OAuth URL for connection (with ad permissions)
 export function generateFacebookOAuthUrl(): string {
   console.log('Generating OAuth URL with app ID:', FACEBOOK_OAUTH_CONFIG.appId);
   
@@ -436,7 +436,25 @@ export function generateFacebookOAuthUrl(): string {
   return oauthUrl;
 }
 
-// Exchange authorization code for access token
+// Generate Facebook OAuth URL for login (basic profile access only)
+export function generateFacebookLoginUrl(): string {
+  console.log('Generating Facebook Login OAuth URL with app ID:', FACEBOOK_LOGIN_CONFIG.appId);
+  
+  const params = new URLSearchParams({
+    client_id: FACEBOOK_LOGIN_CONFIG.appId,
+    redirect_uri: FACEBOOK_LOGIN_CONFIG.redirectUri,
+    scope: FACEBOOK_LOGIN_CONFIG.scope,
+    state: FACEBOOK_LOGIN_CONFIG.state,
+    response_type: 'code'
+  });
+
+  const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
+  console.log('Generated Facebook Login OAuth URL:', oauthUrl);
+  
+  return oauthUrl;
+}
+
+// Exchange authorization code for access token (for connection)
 export async function exchangeCodeForToken(code: string): Promise<{ access_token: string; token_type: string; expires_in: number }> {
   const params = new URLSearchParams({
     client_id: FACEBOOK_OAUTH_CONFIG.appId,
@@ -449,6 +467,24 @@ export async function exchangeCodeForToken(code: string): Promise<{ access_token
   
   if (!response.ok) {
     throw new Error('Failed to exchange code for access token');
+  }
+
+  return response.json();
+}
+
+// Exchange authorization code for access token (for login)
+export async function exchangeLoginCodeForToken(code: string): Promise<{ access_token: string; token_type: string; expires_in: number }> {
+  const params = new URLSearchParams({
+    client_id: FACEBOOK_LOGIN_CONFIG.appId,
+    client_secret: FACEBOOK_LOGIN_CONFIG.appSecret,
+    redirect_uri: FACEBOOK_LOGIN_CONFIG.redirectUri,
+    code: code
+  });
+
+  const response = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params.toString()}`);
+  
+  if (!response.ok) {
+    throw new Error('Failed to exchange login code for access token');
   }
 
   return response.json();
