@@ -52,12 +52,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
             </Link>
 
             <Link 
-              href="/dashboard/alerts" 
-              className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Alerts
-            </Link>
-            <Link 
               href="/dashboard/ai-alerts" 
               className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
             >
@@ -68,12 +62,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
               className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
             >
               Settings
-            </Link>
-            <Link 
-              href="/dashboard/ai-demo" 
-              className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              AI Demo
             </Link>
           </div>
 
@@ -134,13 +122,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
               </Link>
 
               <Link
-                href="/dashboard/alerts"
-                className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Alerts
-              </Link>
-              <Link
                 href="/dashboard/ai-alerts"
                 className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
                 onClick={() => setIsMenuOpen(false)}
@@ -153,13 +134,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Settings
-              </Link>
-              <Link
-                href="/dashboard/ai-demo"
-                className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                AI Demo
               </Link>
               <div className="border-t border-gray-200 pt-4">
                 <div className="flex items-center space-x-3 px-3 py-2">
