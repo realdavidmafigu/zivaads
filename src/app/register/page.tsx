@@ -160,6 +160,24 @@ export default function RegisterPage() {
           </form>
         </div>
       </div>
+      
+      {/* Footer */}
+      <footer className="mt-auto py-8 bg-white border-t border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xs">Z</span>
+              </div>
+              <span className="text-sm text-gray-600">© 2024 ZivaAds. All rights reserved.</span>
+            </div>
+            <div className="flex space-x-6 text-sm text-gray-600">
+              <Link href="/terms" className="hover:text-gray-900 transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-gray-900 transition-colors">Privacy</Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 } 
