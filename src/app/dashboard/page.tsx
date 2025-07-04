@@ -71,45 +71,24 @@ export default function DashboardPage() {
       const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE').length;
       const totalSpend = campaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
       const totalClicks = campaigns.reduce((sum, c) => sum + (Number(c.clicks) || 0), 0);
-      const totalImpressions = campaigns.reduce((sum, c) => sum + (Number(c.impressions) || 0), 0);
 
-      // Prepare metrics data for AI analysis
-      const metrics = {
-        totalCampaigns: campaigns.length,
-        activeCampaigns: activeCampaigns,
-        totalSpend: totalSpend,
-        totalClicks: totalClicks,
-        totalImpressions: totalImpressions,
-        averageSpend: totalSpend / campaigns.length || 0,
-        averageClicks: totalClicks / campaigns.length || 0
-      };
-
-      const response = await fetch('/api/ai-explain', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          metrics: metrics,
-          campaigns: campaigns.slice(0, 5) // Send first 5 campaigns to avoid too much data
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Extract just the first 2-3 sentences for the header
-        const fullInsight = data.insight || "Your campaigns are running. Check individual campaign details for more insights.";
-        const sentences = fullInsight.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
-        const shortSummary = sentences.slice(0, 2).join('. ') + '.';
-        setAiSummary(shortSummary);
+      // Create a simple, concise summary without calling the AI API
+      let summary = "";
+      
+      if (activeCampaigns === 0) {
+        summary = "All campaigns are paused. Consider activating your best performers to drive results.";
+      } else if (activeCampaigns === 1) {
+        summary = `You have 1 active campaign running with $${totalSpend.toFixed(2)} spend. Keep monitoring performance!`;
       } else {
-        setAiSummary(`You have ${activeCampaigns} active campaigns running with $${totalSpend.toFixed(2)} total spend. Your ads are performing well!`);
+        summary = `You have ${activeCampaigns} active campaigns with $${totalSpend.toFixed(2)} total spend. ${totalClicks > 0 ? 'Great engagement so far!' : 'Ready to see results!'}`;
       }
+      
+      setAiSummary(summary);
     } catch (error) {
       console.error('Error generating AI summary:', error);
       const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE').length;
       const totalSpend = campaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
-      setAiSummary(`You have ${activeCampaigns} active campaigns running with $${totalSpend.toFixed(2)} total spend. Your ads are performing well!`);
+      setAiSummary(`You have ${activeCampaigns} active campaigns with $${totalSpend.toFixed(2)} spend.`);
     }
     setSummaryLoading(false);
   };
@@ -315,27 +294,27 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex-1">
-              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 {getGreeting()}, {userName}! 👋
               </h1>
-              <p className="text-gray-600 text-sm sm:text-base mt-1 max-w-2xl">
+              <p className="text-gray-600 text-sm mt-0.5 max-w-xl truncate">
                 {summaryLoading ? "Loading your campaign summary..." : aiSummary}
               </p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-shrink-0">
               <button
                 onClick={() => router.push('/test-ai-alerts')}
-                className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all text-sm font-medium"
+                className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all text-sm font-medium"
               >
                 <SparklesIcon className="h-4 w-4" />
                 <span>AI Reports</span>
               </button>
               <button
                 onClick={() => router.push('/dashboard/settings/alerts')}
-                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="flex items-center space-x-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
               >
                 <CogIcon className="h-4 w-4 text-gray-600" />
                 <span>Settings</span>
