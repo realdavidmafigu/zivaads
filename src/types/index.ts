@@ -79,6 +79,7 @@ export interface FacebookAccount {
   id: string;
   facebook_account_id: string;
   account_name: string;
+  name?: string; // Facebook API might return 'name' instead of 'account_name'
   account_status: number;
   currency: string;
   timezone_name: string;

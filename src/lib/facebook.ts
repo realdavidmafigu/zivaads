@@ -120,7 +120,7 @@ export class FacebookApiClient {
   async getAdAccounts(): Promise<FacebookAccount[]> {
     try {
       const response = await this.makeRequest<FacebookApiResponse<FacebookAccount>>('/me/adaccounts', {
-        fields: 'id,name,account_status,currency,timezone_name,business_name,account_id,disable_reason,amount_spent,balance',
+        fields: 'id,account_name,name,account_status,currency,timezone_name,business_name,account_id,disable_reason,amount_spent,balance',
         limit: 100
       });
 

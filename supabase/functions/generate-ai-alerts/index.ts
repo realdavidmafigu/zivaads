@@ -42,7 +42,7 @@ serve(async (req) => {
 
     // Get campaigns with performance data
     const { data: campaigns, error: campaignsError } = await supabase
-      .from('facebook_campaigns')
+      .from('campaigns')
       .select(`
         *,
         facebook_accounts!inner(*)

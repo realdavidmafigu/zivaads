@@ -328,8 +328,17 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, insights, simpleM
           <button className="bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
             ⚙️ Optimize
           </button>
-          <button className="bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
-            📄 Report
+          <button 
+            onClick={() => {
+              const campaignName = encodeURIComponent(campaign.name || 'Unknown Campaign');
+              const message = encodeURIComponent(`Send me insights for Campaign: ${campaign.name || 'Unknown Campaign'}`);
+              const whatsappUrl = `https://wa.me/263771555468?text=${message}`;
+              window.open(whatsappUrl, '_blank');
+            }}
+            className="bg-green-500 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center space-x-1"
+          >
+            <span>📲</span>
+            <span>Get Insights</span>
           </button>
         </div>
       </div>

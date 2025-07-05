@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
         adAccounts.map(account => ({
           user_id: user.id,
           facebook_account_id: account.id,
-          account_name: account.account_name || 'Unknown',
+          account_name: account.account_name || account.name || account.business_name || `Account ${account.id}`,
           access_token: access_token,
           token_expires_at: tokenExpiresAt.toISOString(),
           account_status: account.account_status,

@@ -2,9 +2,12 @@
 export const WHATSAPP_CONFIG = {
   // API Configuration - Using test credentials for development
   apiVersion: 'v19.0',
-  phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '713498348512377',
-  accessToken: process.env.WHATSAPP_ACCESS_TOKEN || 'test_access_token_for_development',
-  verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'test_verify_token',
+  // TODO: Replace with the correct Phone Number ID from Meta Developer Console
+  // Go to: Meta for Developers > Your App > WhatsApp > Getting Started
+  // Find your phone number +263 77 155 5468 and copy its Phone Number ID
+  phoneNumberId: '713498348512377', // <-- Correct Phone Number ID for +263 77 155 5468
+  accessToken: 'EAFTe1yovOfsBPOKZCxS00BptvFZCCdZBDBi2zQnIBYuTrZCbsJckj1JLmyyZBZAScW6MxVuEqrMlMjcjBBm4Th8Eg9s99ZAACtCIftFeeH9urR6qm7Q2w7vgIkF26dsmliDbKZCGbJZCMZCIZCCf4WU6fEJyQIad9GUcKZARMu9DaOeZCezBYiFz17ypYXPfThehD69Es6m1GxynUGQR2mP9LZByzu575EqJ1aqVZAZBB0OM8cNBWZBLrdSPc',
+  verifyToken: 'test_verify_token',
   
   // Rate Limiting Configuration
   rateLimit: {
@@ -15,16 +18,16 @@ export const WHATSAPP_CONFIG = {
   
   // Default Settings
   defaultLanguage: 'en',
-  defaultCountryCode: '27', // South Africa
+  defaultCountryCode: '263', // Zimbabwe
   
   // Testing Configuration
-  isTestMode: process.env.NODE_ENV === 'development',
-  testPhoneNumber: process.env.TEST_WHATSAPP_NUMBER || '+27123456789',
+  isTestMode: false, // Disabled test mode - now sending real messages
+  testPhoneNumber: '+263718558160', // Updated to your number
 };
 
 // WhatsApp API endpoints
 export const WHATSAPP_ENDPOINTS = {
-  messages: `https://graph.facebook.com/${WHATSAPP_CONFIG.apiVersion}/${WHATSAPP_CONFIG.phoneNumberId}/messages`,
+  messages: () => `https://graph.facebook.com/${WHATSAPP_CONFIG.apiVersion}/${WHATSAPP_CONFIG.phoneNumberId}/messages`,
   webhook: '/api/whatsapp/webhook',
 };
 
