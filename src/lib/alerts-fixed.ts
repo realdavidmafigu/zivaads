@@ -426,11 +426,11 @@ export class AlertDetector {
       const alerts = data || [];
       return {
         total: alerts.length,
-        resolved: alerts.filter(a => a.is_resolved).length,
-        critical: alerts.filter(a => a.severity === 'critical').length,
-        high: alerts.filter(a => a.severity === 'high').length,
-        medium: alerts.filter(a => a.severity === 'medium').length,
-        low: alerts.filter(a => a.severity === 'low').length,
+        resolved: alerts.filter((a: any) => a.is_resolved).length,
+        critical: alerts.filter((a: any) => a.severity === 'critical').length,
+        high: alerts.filter((a: any) => a.severity === 'high').length,
+        medium: alerts.filter((a: any) => a.severity === 'medium').length,
+        low: alerts.filter((a: any) => a.severity === 'low').length,
       };
     } catch (error) {
       console.error('Error fetching alert stats:', error);
