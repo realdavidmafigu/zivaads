@@ -1,0 +1,24 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-facebook-campaigns",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/check-campaigns",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/ai-daily-alerts?type=morning",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/ai-daily-alerts?type=afternoon",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/ai-daily-alerts?type=evening",
+      "schedule": "0 20 * * *"
+    }
+  ]
+} 
