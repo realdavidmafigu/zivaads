@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase';
-import { getRecentAlerts, getAlertStats } from '@/lib/alerts';
+import { getRecentAlerts } from '@/lib/alerts';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,11 +33,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '30');
 
-    // Fetch alerts and stats
-    const [alerts, stats] = await Promise.all([
-      getRecentAlerts(user.id, days),
-      getAlertStats(user.id)
-    ]);
+    // Fetch alerts
+    const alerts = await getRecentAlerts(user.id, days);
+
+    // Calculate basic stats from alerts
+    const stats = {
+      total: alerts.length,
+      resolved: alerts.filter(alert => alert.is_resolved).length,
+      high: alerts.filter(alert => alert.severity === 'high').length,
+      medium: alerts.filter(alert => alert.severity === 'medium').length,
+      low: alerts.filter(alert => alert.severity === 'low').length,
+    };
 
     return NextResponse.json({
       data: alerts,

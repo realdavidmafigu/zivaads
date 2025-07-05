@@ -8,12 +8,34 @@ interface EnhancedCampaignCardProps {
   simpleMode?: boolean;
 }
 
-// Performance ribbon colors and text
+// Performance ribbon calculation
 const getPerformanceRibbon = (ctr: number, cpc: number) => {
-  if (ctr === 0 || cpc === 0) return { color: 'bg-gray-100 text-gray-600', text: 'No Data', emoji: '❓' };
-  if (ctr > 2 && cpc < 0.5) return { color: 'bg-green-100 text-green-700', text: 'Great Performance', emoji: '🟢' };
-  if (ctr > 1 && cpc < 1) return { color: 'bg-yellow-100 text-yellow-700', text: 'Moderate', emoji: '🟡' };
-  return { color: 'bg-red-100 text-red-700', text: 'Poor', emoji: '🔴' };
+  if (ctr > 2 && cpc < 0.5) return { emoji: '🚀', text: 'Excellent Performance', color: 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' };
+  if (ctr > 1.5 && cpc < 1) return { emoji: '📈', text: 'Good Performance', color: 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' };
+  if (ctr > 1 && cpc < 2) return { emoji: '⚠️', text: 'Needs Attention', color: 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' };
+  return { emoji: '🔴', text: 'Poor Performance', color: 'bg-gradient-to-r from-red-500 to-pink-500 text-white' };
+};
+
+// Health score calculation
+const calculateHealthScore = (ctr: number, cpc: number, status: string): number => {
+  let score = 50; // Base score
+  
+  // CTR scoring
+  if (ctr > 2) score += 25;
+  else if (ctr > 1.5) score += 15;
+  else if (ctr > 1) score += 5;
+  else if (ctr < 0.5) score -= 20;
+  
+  // CPC scoring
+  if (cpc < 0.5) score += 20;
+  else if (cpc < 1) score += 10;
+  else if (cpc > 2) score -= 15;
+  
+  // Status scoring
+  if (status === 'PAUSED') score -= 10;
+  else if (status === 'ACTIVE') score += 5;
+  
+  return Math.max(0, Math.min(100, score));
 };
 
 // Campaign type detection
@@ -36,41 +58,15 @@ const getCampaignDuration = (startTime: string) => {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   if (diffDays === 1) return 'Started today';
-  if (diffDays < 7) return `Running for ${diffDays} days`;
-  if (diffDays < 30) return `Running for ${Math.floor(diffDays / 7)} weeks`;
-  return `Running for ${Math.floor(diffDays / 30)} months`;
-};
-
-// Health score calculation (1-100)
-const calculateHealthScore = (ctr: number, cpc: number, status: string) => {
-  if (ctr === 0 || cpc === 0) return 0;
-  
-  let score = 0;
-  
-  // CTR scoring (0-40 points)
-  if (ctr > 3) score += 40;
-  else if (ctr > 2) score += 30;
-  else if (ctr > 1) score += 20;
-  else if (ctr > 0.5) score += 10;
-  
-  // CPC scoring (0-40 points) - lower is better
-  if (cpc < 0.5) score += 40;
-  else if (cpc < 1) score += 30;
-  else if (cpc < 2) score += 20;
-  else if (cpc < 5) score += 10;
-  
-  // Status scoring (0-20 points)
-  if (status === 'ACTIVE') score += 20;
-  else if (status === 'LEARNING') score += 15;
-  else if (status === 'PAUSED') score += 5;
-  
-  return Math.min(100, score);
+  if (diffDays < 7) return `${diffDays} days`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks`;
+  return `${Math.floor(diffDays / 30)} months`;
 };
 
 // Recommended action based on performance
 const getRecommendedAction = (ctr: number, cpc: number, status: string, healthScore: number) => {
   if (status === 'PAUSED' && healthScore > 60) {
-    return { action: 'Reactivate & Scale Budget', icon: '✅', color: 'bg-green-100 text-green-700' };
+    return { action: 'Reactivate', icon: '✅', color: 'bg-green-100 text-green-700' };
   }
   if (ctr < 1 && cpc > 2) {
     return { action: 'Change Image', icon: '🔄', color: 'bg-blue-100 text-blue-700' };
@@ -82,55 +78,6 @@ const getRecommendedAction = (ctr: number, cpc: number, status: string, healthSc
     return { action: 'Pause & Optimize', icon: '⏸️', color: 'bg-red-100 text-red-700' };
   }
   return { action: 'Monitor', icon: '👀', color: 'bg-gray-100 text-gray-700' };
-};
-
-// Simple sparkline component
-const Sparkline = ({ data, color = 'blue' }: { data: number[], color?: string }) => {
-  if (!data || data.length < 2) return null;
-  
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  
-  const points = data.map((value, index) => {
-    const x = (index / (data.length - 1)) * 100;
-    const y = 100 - ((value - min) / range) * 100;
-    return `${x},${y}`;
-  }).join(' ');
-  
-  return (
-    <svg className="w-16 h-8" viewBox="0 0 100 100" preserveAspectRatio="none">
-      <polyline
-        fill="none"
-        stroke={`var(--tw-color-${color}-500)`}
-        strokeWidth="2"
-        points={points}
-      />
-    </svg>
-  );
-};
-
-// Tooltip component
-const Tooltip = ({ children, content }: { children: React.ReactNode, content: string }) => {
-  const [show, setShow] = useState(false);
-  
-  return (
-    <div className="relative inline-block">
-      <div
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-        className="cursor-help"
-      >
-        {children}
-      </div>
-      {show && (
-        <div className="absolute z-10 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg whitespace-nowrap -top-8 left-1/2 transform -translate-x-1/2">
-          {content}
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-        </div>
-      )}
-    </div>
-  );
 };
 
 const EnhancedCampaignCard: React.FC<EnhancedCampaignCardProps> = ({ campaign, insights, simpleMode = false }) => {
@@ -152,10 +99,6 @@ const EnhancedCampaignCard: React.FC<EnhancedCampaignCardProps> = ({ campaign, i
   const healthScore = calculateHealthScore(ctr, cpc, campaign.status);
   const recommendedAction = getRecommendedAction(ctr, cpc, campaign.status, healthScore);
   
-  // Mock trend data (in real app, this would come from historical data)
-  const ctrTrend = [1.2, 1.5, 1.8, 2.1, 2.3, 2.0, 1.9, 2.2];
-  const spendTrend = [10, 15, 12, 18, 20, 16, 14, 17];
-  
   // Check if account has payment issues
   const hasPaymentIssue = campaign.facebook_account_id && 
     campaign.account_name && 
@@ -166,16 +109,16 @@ const EnhancedCampaignCard: React.FC<EnhancedCampaignCardProps> = ({ campaign, i
       hasPaymentIssue ? 'border-red-300 bg-red-50' : 'border-gray-200'
     }`}>
       {/* Performance Ribbon */}
-      <div className={`px-4 py-2 ${performanceRibbon.color} flex items-center justify-between`}>
+      <div className={`px-3 py-2 ${performanceRibbon.color} flex items-center justify-between`}>
         <div className="flex items-center space-x-2">
-          <span className="text-lg">{performanceRibbon.emoji}</span>
-          <span className="font-medium text-sm">{performanceRibbon.text}</span>
+          <span className="text-base">{performanceRibbon.emoji}</span>
+          <span className="font-medium text-xs sm:text-sm">{performanceRibbon.text}</span>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-xs">Health Score:</span>
+        <div className="flex items-center space-x-1">
+          <span className="text-xs">Health:</span>
           <div className="flex items-center space-x-1">
             {[...Array(5)].map((_, i) => (
-              <span key={i} className={`text-sm ${i < Math.floor(healthScore / 20) ? 'text-yellow-500' : 'text-gray-300'}`}>
+              <span key={i} className={`text-xs ${i < Math.floor(healthScore / 20) ? 'text-yellow-300' : 'text-gray-300'}`}>
                 ★
               </span>
             ))}
@@ -183,153 +126,151 @@ const EnhancedCampaignCard: React.FC<EnhancedCampaignCardProps> = ({ campaign, i
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4">
         {/* Payment Issue Alert */}
         {hasPaymentIssue && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-200 rounded-lg">
+          <div className="mb-3 p-2 bg-red-100 border border-red-200 rounded-lg">
             <div className="flex items-center">
-              <svg className="w-4 h-4 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-3 h-3 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <span className="text-sm font-medium text-red-700">Account Payment Issue</span>
+              <span className="text-xs font-medium text-red-700">Payment Issue</span>
             </div>
           </div>
         )}
 
         {/* Campaign Header */}
-        <div className="mb-4">
+        <div className="mb-3">
           <div className="flex items-start justify-between mb-2">
-            <h3 className="text-lg font-bold text-gray-900 truncate pr-2" title={campaign.name}>
-              {campaign.name || 'Zimbabwe Business Campaign'}
+            <h3 className="text-sm font-bold text-gray-900 truncate pr-2 flex-1" title={campaign.name}>
+              {campaign.name || 'Campaign'}
             </h3>
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${campaign.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : campaign.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+              campaign.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 
+              campaign.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-700' : 
+              'bg-gray-100 text-gray-700'
+            }`}>
               {campaign.status || 'ACTIVE'}
             </span>
           </div>
           
           {/* Campaign Type & Duration */}
-          <div className="flex items-center space-x-3 text-sm text-gray-600 mb-3">
+          <div className="flex items-center space-x-2 text-xs text-gray-600 mb-2">
             <span className="flex items-center space-x-1">
               <span>{campaignType.icon}</span>
-              <span>{campaignType.label} Campaign</span>
+              <span>{campaignType.label}</span>
             </span>
             <span>•</span>
             <span>{duration}</span>
           </div>
         </div>
 
-        {/* Key Metrics with Visual Hierarchy */}
-        <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">📊 Key Metrics</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <Tooltip content="Click-through-rate. This shows how many people clicked after seeing your ad.">
-                <div className="text-xs text-gray-600 mb-1">CTR</div>
-              </Tooltip>
-              <div className="text-2xl font-bold text-blue-600">
+        {/* Key Metrics - Mobile Responsive Grid */}
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-gray-700 mb-2">📊 Key Metrics</h4>
+          
+          {/* Primary Metrics */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="text-center p-2 bg-blue-50 rounded-lg">
+              <div className="text-xs text-gray-600 mb-1">CTR</div>
+              <div className="text-lg font-bold text-blue-600">
                 {ctr > 0 ? `${ctr.toFixed(2)}%` : 'N/A'}
               </div>
-              <Sparkline data={ctrTrend} color="blue" />
             </div>
             
-            <div className="text-center p-3 bg-green-50 rounded-lg">
-              <Tooltip content="Cost per click. This shows how much you pay for each click on your ad.">
-                <div className="text-xs text-gray-600 mb-1">CPC</div>
-              </Tooltip>
-              <div className="text-2xl font-bold text-green-600">
+            <div className="text-center p-2 bg-green-50 rounded-lg">
+              <div className="text-xs text-gray-600 mb-1">CPC</div>
+              <div className="text-lg font-bold text-green-600">
                 {cpc > 0 ? `$${cpc.toFixed(2)}` : 'N/A'}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                {clicks > 0 ? `${clicks.toLocaleString()} clicks` : 'No clicks'}
               </div>
             </div>
           </div>
           
-          <div className="grid grid-cols-3 gap-2 mt-3 text-sm">
-            <div className="text-center">
+          {/* Secondary Metrics */}
+          <div className="grid grid-cols-3 gap-1 text-xs">
+            <div className="text-center p-1">
               <div className="text-gray-600">Spend</div>
-              <div className="font-semibold">{spent ? `$${spent.toFixed(2)}` : 'N/A'}</div>
+              <div className="font-semibold">{spent ? `$${spent.toFixed(0)}` : 'N/A'}</div>
             </div>
-            <div className="text-center">
-              <div className="text-gray-600">Impressions</div>
-              <div className="font-semibold">{impressions ? impressions.toLocaleString() : 'N/A'}</div>
+            <div className="text-center p-1">
+              <div className="text-gray-600">Clicks</div>
+              <div className="font-semibold">{clicks ? clicks.toLocaleString() : 'N/A'}</div>
             </div>
-            <div className="text-center">
+            <div className="text-center p-1">
               <div className="text-gray-600">Reach</div>
               <div className="font-semibold">{reach ? reach.toLocaleString() : 'N/A'}</div>
             </div>
           </div>
         </div>
 
-        {/* AI Insights */}
-        <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">🔍 AI Insights</h4>
-          <div className="space-y-2 text-sm">
+        {/* AI Insights - Simplified for Mobile */}
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-gray-700 mb-2">🔍 AI Insights</h4>
+          <div className="space-y-1 text-xs">
             {ctr > 2 ? (
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start space-x-1">
                 <span className="text-green-500">✓</span>
-                <span>Excellent Click Rate – People like your ad.</span>
+                <span>Excellent CTR - People love your ad</span>
               </div>
             ) : ctr > 1 ? (
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start space-x-1">
                 <span className="text-yellow-500">⚠</span>
-                <span>Average Click Rate – Consider testing new creatives.</span>
+                <span>Good CTR - Test new creatives</span>
               </div>
             ) : (
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start space-x-1">
                 <span className="text-red-500">✗</span>
-                <span>Low Click Rate – Try a new image or improve your ad.</span>
+                <span>Low CTR - Try new image</span>
               </div>
             )}
             
             {cpc < 0.5 ? (
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start space-x-1">
                 <span className="text-green-500">✓</span>
-                <span>Very Low CPC – You're getting great value.</span>
+                <span>Great CPC value</span>
               </div>
             ) : cpc < 1 ? (
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start space-x-1">
                 <span className="text-yellow-500">⚠</span>
-                <span>Moderate CPC – Consider optimizing your targeting.</span>
+                <span>Reasonable CPC</span>
               </div>
             ) : (
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start space-x-1">
                 <span className="text-red-500">✗</span>
-                <span>High CPC – Review your targeting and ad quality.</span>
-              </div>
-            )}
-            
-            {campaign.status === 'PAUSED' && (
-              <div className="flex items-start space-x-2">
-                <span className="text-blue-500">ℹ</span>
-                <span>Campaign is Paused – Consider reactivating.</span>
+                <span>High CPC - Review targeting</span>
               </div>
             )}
           </div>
         </div>
 
         {/* Recommended Action */}
-        <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">🎯 Suggested Action</h4>
-          <div className={`inline-flex items-center space-x-2 px-3 py-2 rounded-lg ${recommendedAction.color}`}>
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-gray-700 mb-2">🎯 Action</h4>
+          <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-lg text-xs ${recommendedAction.color}`}>
             <span>{recommendedAction.icon}</span>
             <span className="font-medium">{recommendedAction.action}</span>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex space-x-2">
+        {/* Action Buttons - Mobile Responsive */}
+        <div className="flex flex-col sm:flex-row gap-2">
           <Link 
             href={`/dashboard/campaigns/${campaign.id}`}
-            className="flex-1 bg-blue-600 text-white text-center py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="flex-1 bg-blue-600 text-white text-center py-2 px-3 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
           >
-            🔍 View Details
+            🔍 Details
           </Link>
-          <button className="bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
-            ⚙️ Optimize
-          </button>
-          <button className="bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
-            📄 Report
+          <button 
+            onClick={() => {
+              const campaignName = encodeURIComponent(campaign.name || 'Unknown Campaign');
+              const message = encodeURIComponent(`Send me insights for Campaign: ${campaign.name || 'Unknown Campaign'}`);
+              const whatsappUrl = `https://wa.me/263771555468?text=${message}`;
+              window.open(whatsappUrl, '_blank');
+            }}
+            className="flex-1 bg-green-500 text-white py-2 px-3 rounded-lg text-xs font-medium hover:bg-green-600 transition-colors flex items-center justify-center space-x-1"
+          >
+            <span>📲</span>
+            <span>WhatsApp</span>
           </button>
         </div>
       </div>

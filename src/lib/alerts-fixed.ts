@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase';
-import { sendWhatsAppAlert, AlertData } from './whatsapp';
 import { FacebookCampaign } from '@/types';
 import { DEFAULT_THRESHOLDS } from '@/config/whatsapp';
 
@@ -13,26 +12,36 @@ export interface AlertThresholds {
 }
 
 export interface CampaignAlert {
-  id: string;
+  id?: string;
   campaign_id: string;
   campaign_name: string;
   alert_type: 'budget_depleted' | 'low_ctr' | 'high_costs' | 'campaign_paused' | 'high_frequency';
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: 'low' | 'medium' | 'high';
   message: string;
-  metadata: Record<string, any>;
-  created_at: string;
-  is_resolved: boolean;
+  metadata: {
+    current_spend?: number;
+    current_ctr?: number;
+    current_cpc?: number;
+    threshold?: number;
+    reason?: string;
+    [key: string]: any;
+  };
+  created_at?: string;
+  resolved_at?: string;
+  is_resolved?: boolean;
 }
 
 export class AlertDetector {
   private supabase: any;
+  private thresholds: AlertThresholds;
 
-  constructor() {
+  constructor(thresholds?: Partial<AlertThresholds>) {
     this.supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    this.thresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
   }
 
   /**
-   * Get user's alert thresholds
+   * Get user-specific alert thresholds
    */
   async getUserThresholds(userId: string): Promise<AlertThresholds> {
     try {
@@ -43,32 +52,115 @@ export class AlertDetector {
         .single();
 
       if (error || !data) {
-        // Return default thresholds if none set
-        return DEFAULT_THRESHOLDS;
+        return this.thresholds;
       }
 
       return {
-        low_ctr: data.low_ctr || DEFAULT_THRESHOLDS.low_ctr,
-        high_cpc: data.high_cpc || DEFAULT_THRESHOLDS.high_cpc,
-        budget_usage: data.budget_usage || DEFAULT_THRESHOLDS.budget_usage,
-        spend_limit: data.spend_limit || DEFAULT_THRESHOLDS.spend_limit,
-        frequency_cap: data.frequency_cap || DEFAULT_THRESHOLDS.frequency_cap,
+        low_ctr: data.low_ctr || this.thresholds.low_ctr,
+        high_cpc: data.high_cpc || this.thresholds.high_cpc,
+        budget_usage: data.budget_usage || this.thresholds.budget_usage,
+        spend_limit: data.spend_limit || this.thresholds.spend_limit,
+        frequency_cap: data.frequency_cap || this.thresholds.frequency_cap,
       };
     } catch (error) {
       console.error('Error fetching user thresholds:', error);
-      return DEFAULT_THRESHOLDS;
+      return this.thresholds;
     }
   }
 
   /**
-   * Detect campaign issues and generate alerts
+   * Detect issues in a single campaign
+   */
+  async checkCampaignIssues(campaign: FacebookCampaign, thresholds?: AlertThresholds): Promise<CampaignAlert[]> {
+    const alerts: CampaignAlert[] = [];
+    const userThresholds = thresholds || this.thresholds;
+
+    // Check budget depletion
+    if (campaign.status === 'ACTIVE' && campaign.daily_budget && campaign.spend) {
+      const budgetUsage = (campaign.spend / campaign.daily_budget) * 100;
+      if (budgetUsage >= userThresholds.budget_usage) {
+        alerts.push({
+          campaign_id: campaign.id,
+          campaign_name: campaign.name,
+          alert_type: 'budget_depleted',
+          severity: 'high',
+          message: `Campaign "${campaign.name}" has used ${budgetUsage.toFixed(1)}% of its daily budget`,
+          metadata: {
+            current_spend: campaign.spend,
+            budget_usage: budgetUsage,
+          },
+        });
+      }
+    }
+
+    // Check low CTR
+    if (campaign.ctr && campaign.ctr < userThresholds.low_ctr) {
+      alerts.push({
+        campaign_id: campaign.id,
+        campaign_name: campaign.name,
+        alert_type: 'low_ctr',
+        severity: 'medium',
+        message: `Campaign "${campaign.name}" has low CTR: ${campaign.ctr.toFixed(2)}%`,
+        metadata: {
+          current_ctr: campaign.ctr,
+          threshold: userThresholds.low_ctr,
+        },
+      });
+    }
+
+    // Check high CPC
+    if (campaign.cpc && campaign.cpc > userThresholds.high_cpc) {
+      alerts.push({
+        campaign_id: campaign.id,
+        campaign_name: campaign.name,
+        alert_type: 'high_costs',
+        severity: 'medium',
+        message: `Campaign "${campaign.name}" has high CPC: $${campaign.cpc.toFixed(2)}`,
+        metadata: {
+          current_cpc: campaign.cpc,
+          threshold: userThresholds.high_cpc,
+        },
+      });
+    }
+
+    // Check campaign pause
+    if (campaign.status === 'PAUSED') {
+      alerts.push({
+        campaign_id: campaign.id,
+        campaign_name: campaign.name,
+        alert_type: 'campaign_paused',
+        severity: 'low',
+        message: `Campaign "${campaign.name}" is paused`,
+        metadata: {
+          reason: 'Campaign manually paused',
+        },
+      });
+    }
+
+    // Check high frequency
+    if (campaign.frequency && campaign.frequency > userThresholds.frequency_cap) {
+      alerts.push({
+        campaign_id: campaign.id,
+        campaign_name: campaign.name,
+        alert_type: 'high_frequency',
+        severity: 'medium',
+        message: `Campaign "${campaign.name}" has high frequency: ${campaign.frequency.toFixed(1)}`,
+        metadata: {
+          current_frequency: campaign.frequency,
+          threshold: userThresholds.frequency_cap,
+        },
+      });
+    }
+
+    return alerts;
+  }
+
+  /**
+   * Detect issues across all user campaigns
    */
   async detectCampaignIssues(userId: string): Promise<CampaignAlert[]> {
     try {
-      const thresholds = await this.getUserThresholds(userId);
-      const alerts: CampaignAlert[] = [];
-
-      // Get user's active campaigns with latest metrics
+      // Get user's campaigns with latest metrics
       const { data: campaigns, error } = await this.supabase
         .from('campaigns')
         .select(`
@@ -87,30 +179,29 @@ export class AlertDetector {
           )
         `)
         .eq('user_id', userId)
-        .in('status', ['ACTIVE', 'LEARNING'])
         .eq('campaign_metrics.is_latest', true);
 
       if (error) {
-        console.error('Error fetching campaigns with metrics:', error);
+        console.error('Error fetching campaigns:', error);
         return [];
       }
 
-      if (!campaigns || campaigns.length === 0) {
-        return [];
-      }
+      // Get user thresholds
+      const thresholds = await this.getUserThresholds(userId);
 
       // Check each campaign for issues
+      const allAlerts: CampaignAlert[] = [];
       for (const campaign of campaigns) {
         const campaignAlerts = await this.checkCampaignIssues(campaign, thresholds);
-        alerts.push(...campaignAlerts);
+        allAlerts.push(...campaignAlerts);
       }
 
       // Store alerts in database
-      if (alerts.length > 0) {
-        await this.storeAlerts(alerts, userId);
+      if (allAlerts.length > 0) {
+        await this.storeAlerts(allAlerts, userId);
       }
 
-      return alerts;
+      return allAlerts;
     } catch (error) {
       console.error('Error detecting campaign issues:', error);
       return [];
@@ -118,137 +209,19 @@ export class AlertDetector {
   }
 
   /**
-   * Check individual campaign for issues
+   * Store alerts in the database
    */
-  private async checkCampaignIssues(
-    campaign: any,
-    thresholds: AlertThresholds
-  ): Promise<CampaignAlert[]> {
-    const alerts: CampaignAlert[] = [];
-    const now = new Date().toISOString();
-
-    // Get the latest metrics for this campaign
-    const metrics = campaign.campaign_metrics?.[0] || {};
-    
-    // Check if campaign is paused
-    if (campaign.status === 'PAUSED') {
-      alerts.push({
-        id: `paused_${campaign.id}`,
-        campaign_id: campaign.id,
-        campaign_name: campaign.name,
-        alert_type: 'campaign_paused',
-        severity: 'medium',
-        message: `Campaign "${campaign.name}" has been paused`,
-        metadata: {
-          reason: 'Campaign status changed to PAUSED',
-          previous_status: campaign.status,
-        },
-        created_at: now,
-        is_resolved: false,
-      });
-    }
-
-    // Check budget depletion (using campaign metadata and metrics)
-    if (campaign.daily_budget && metrics.spend) {
-      const budgetUsage = (metrics.spend / campaign.daily_budget) * 100;
-      if (budgetUsage >= thresholds.budget_usage) {
-        alerts.push({
-          id: `budget_${campaign.id}`,
-          campaign_id: campaign.id,
-          campaign_name: campaign.name,
-          alert_type: 'budget_depleted',
-          severity: budgetUsage >= 100 ? 'high' : 'medium',
-          message: `Campaign "${campaign.name}" has used ${budgetUsage.toFixed(1)}% of daily budget`,
-          metadata: {
-            budget_usage: budgetUsage,
-            daily_budget: campaign.daily_budget,
-            current_spend: metrics.spend,
-            threshold: thresholds.budget_usage,
-          },
-          created_at: now,
-          is_resolved: false,
-        });
-      }
-    }
-
-    // Check low CTR
-    if (metrics.ctr && metrics.ctr < thresholds.low_ctr) {
-      alerts.push({
-        id: `ctr_${campaign.id}`,
-        campaign_id: campaign.id,
-        campaign_name: campaign.name,
-        alert_type: 'low_ctr',
-        severity: metrics.ctr < thresholds.low_ctr * 0.5 ? 'high' : 'medium',
-        message: `Low CTR detected for "${campaign.name}": ${metrics.ctr.toFixed(2)}%`,
-        metadata: {
-          current_ctr: metrics.ctr,
-          threshold: thresholds.low_ctr,
-          impressions: metrics.impressions,
-          clicks: metrics.clicks,
-        },
-        created_at: now,
-        is_resolved: false,
-      });
-    }
-
-    // Check high CPC
-    if (metrics.cpc && metrics.cpc > thresholds.high_cpc) {
-      alerts.push({
-        id: `cpc_${campaign.id}`,
-        campaign_id: campaign.id,
-        campaign_name: campaign.name,
-        alert_type: 'high_costs',
-        severity: metrics.cpc > thresholds.high_cpc * 2 ? 'high' : 'medium',
-        message: `High CPC detected for "${campaign.name}": $${metrics.cpc.toFixed(2)}`,
-        metadata: {
-          current_cpc: metrics.cpc,
-          threshold: thresholds.high_cpc,
-          spend: metrics.spend,
-          clicks: metrics.clicks,
-        },
-        created_at: now,
-        is_resolved: false,
-      });
-    }
-
-    // Check high frequency
-    if (metrics.frequency && metrics.frequency > thresholds.frequency_cap) {
-      alerts.push({
-        id: `freq_${campaign.id}`,
-        campaign_id: campaign.id,
-        campaign_name: campaign.name,
-        alert_type: 'high_frequency',
-        severity: metrics.frequency > thresholds.frequency_cap * 1.5 ? 'high' : 'medium',
-        message: `High frequency detected for "${campaign.name}": ${metrics.frequency.toFixed(2)}`,
-        metadata: {
-          current_frequency: metrics.frequency,
-          threshold: thresholds.frequency_cap,
-          reach: metrics.reach,
-          impressions: metrics.impressions,
-        },
-        created_at: now,
-        is_resolved: false,
-      });
-    }
-
-    return alerts;
-  }
-
-  /**
-   * Store alerts in database
-   */
-  private async storeAlerts(alerts: CampaignAlert[], userId: string): Promise<void> {
+  async storeAlerts(alerts: CampaignAlert[], userId: string): Promise<void> {
     try {
       const alertRecords = alerts.map(alert => ({
         user_id: userId,
         campaign_id: alert.campaign_id,
+        campaign_name: alert.campaign_name,
         alert_type: alert.alert_type,
         severity: alert.severity,
-        title: alert.message,
         message: alert.message,
         metadata: alert.metadata,
-        is_resolved: alert.is_resolved,
-        created_at: alert.created_at,
+        created_at: new Date().toISOString(),
       }));
 
       const { error } = await this.supabase
@@ -257,8 +230,6 @@ export class AlertDetector {
 
       if (error) {
         console.error('Error storing alerts:', error);
-      } else {
-        console.log(`Successfully stored ${alerts.length} alerts for user ${userId}`);
       }
     } catch (error) {
       console.error('Error storing alerts:', error);
@@ -266,78 +237,28 @@ export class AlertDetector {
   }
 
   /**
-   * Send WhatsApp alerts for detected issues
-   */
-  async sendWhatsAppAlerts(userId: string, alerts: CampaignAlert[]): Promise<void> {
-    try {
-      for (const alert of alerts) {
-        const alertData: AlertData = {
-          campaign_name: alert.campaign_name,
-          campaign_id: alert.campaign_id,
-          ...alert.metadata,
-        };
-
-        // Map alert types to WhatsApp alert types
-        let whatsappAlertType: 'budget_depleted' | 'low_ctr' | 'high_costs' | 'campaign_paused' | 'test_message';
-        
-        switch (alert.alert_type) {
-          case 'budget_depleted':
-            whatsappAlertType = 'budget_depleted';
-            alertData.spend = alert.metadata.current_spend;
-            break;
-          case 'low_ctr':
-            whatsappAlertType = 'low_ctr';
-            alertData.ctr = alert.metadata.current_ctr;
-            alertData.threshold = alert.metadata.threshold;
-            break;
-          case 'high_costs':
-            whatsappAlertType = 'high_costs';
-            alertData.cpc = alert.metadata.current_cpc;
-            alertData.threshold = alert.metadata.threshold;
-            break;
-          case 'campaign_paused':
-            whatsappAlertType = 'campaign_paused';
-            alertData.reason = alert.metadata.reason;
-            break;
-          default:
-            whatsappAlertType = 'test_message';
-        }
-
-        try {
-          await sendWhatsAppAlert(userId, whatsappAlertType, alertData);
-          console.log(`WhatsApp alert sent for campaign: ${alert.campaign_name}`);
-        } catch (whatsappError) {
-          console.error(`Failed to send WhatsApp alert for campaign ${alert.campaign_name}:`, whatsappError);
-        }
-      }
-    } catch (error) {
-      console.error('Error sending WhatsApp alerts:', error);
-    }
-  }
-
-  /**
    * Get recent alerts for a user
    */
-  async getRecentAlerts(userId: string, days: number = 30): Promise<any[]> {
+  async getRecentAlerts(userId: string, days: number = 30): Promise<CampaignAlert[]> {
     try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+
       const { data, error } = await this.supabase
         .from('alerts')
-        .select(`
-          *,
-          campaigns(name)
-        `)
+        .select('*')
         .eq('user_id', userId)
-        .gte('created_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
+        .gte('created_at', cutoffDate.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching recent alerts:', error);
+        console.error('Error fetching alerts:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Error fetching recent alerts:', error);
+      console.error('Error fetching alerts:', error);
       return [];
     }
   }
@@ -352,7 +273,6 @@ export class AlertDetector {
         .update({
           is_resolved: true,
           resolved_at: new Date().toISOString(),
-          resolved_by: userId,
         })
         .eq('id', alertId)
         .eq('user_id', userId);
@@ -368,86 +288,10 @@ export class AlertDetector {
       return false;
     }
   }
-
-  /**
-   * Update user's alert thresholds
-   */
-  async updateThresholds(userId: string, thresholds: Partial<AlertThresholds>): Promise<boolean> {
-    try {
-      const { error } = await this.supabase
-        .from('user_alert_thresholds')
-        .upsert({
-          user_id: userId,
-          ...thresholds,
-          updated_at: new Date().toISOString(),
-        });
-
-      if (error) {
-        console.error('Error updating thresholds:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error updating thresholds:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get alert statistics for a user
-   */
-  async getAlertStats(userId: string): Promise<{
-    total: number;
-    resolved: number;
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-  }> {
-    try {
-      const { data, error } = await this.supabase
-        .from('alerts')
-        .select('severity, is_resolved')
-        .eq('user_id', userId);
-
-      if (error) {
-        console.error('Error fetching alert stats:', error);
-        return {
-          total: 0,
-          resolved: 0,
-          critical: 0,
-          high: 0,
-          medium: 0,
-          low: 0,
-        };
-      }
-
-      const alerts = data || [];
-      return {
-        total: alerts.length,
-        resolved: alerts.filter((a: any) => a.is_resolved).length,
-        critical: alerts.filter((a: any) => a.severity === 'critical').length,
-        high: alerts.filter((a: any) => a.severity === 'high').length,
-        medium: alerts.filter((a: any) => a.severity === 'medium').length,
-        low: alerts.filter((a: any) => a.severity === 'low').length,
-      };
-    } catch (error) {
-      console.error('Error fetching alert stats:', error);
-      return {
-        total: 0,
-        resolved: 0,
-        critical: 0,
-        high: 0,
-        medium: 0,
-        low: 0,
-      };
-    }
-  }
 }
 
-// Create a singleton instance
-export const alertDetector = new AlertDetector();
+// Create singleton instance
+const alertDetector = new AlertDetector();
 
 // Export convenience functions
 export const detectCampaignIssues = (userId: string) => 
@@ -457,10 +301,4 @@ export const getRecentAlerts = (userId: string, days?: number) =>
   alertDetector.getRecentAlerts(userId, days);
 
 export const resolveAlert = (alertId: string, userId: string) => 
-  alertDetector.resolveAlert(alertId, userId);
-
-export const updateAlertThresholds = (userId: string, thresholds: Partial<AlertThresholds>) => 
-  alertDetector.updateThresholds(userId, thresholds);
-
-export const getAlertStats = (userId: string) => 
-  alertDetector.getAlertStats(userId); 
+  alertDetector.resolveAlert(alertId, userId); 

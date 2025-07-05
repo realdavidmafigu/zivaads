@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase';
-import { alertDetector } from '@/lib/alerts';
+import { AlertDetector } from '@/lib/alerts';
 
 export async function POST(request: NextRequest) {
   try {
     // Initialize Supabase client
     const cookieStore = await cookies();
     const supabase = createServerClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY,
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           get(name: string) {
@@ -29,42 +28,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get request body for custom parameters
-    const body = await request.json();
-    const { forceGenerate = false, campaignId } = body;
+    // Parse request body
+    const { campaignId, forceGenerate } = await request.json();
 
+    // Initialize alert detector
+    const alertDetector = new AlertDetector();
     let alerts = [];
 
     if (campaignId) {
       // Generate alerts for specific campaign
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
-        .select('*')
+        .select(`
+          *,
+          campaign_metrics!inner(
+            impressions,
+            clicks,
+            ctr,
+            cpc,
+            cpm,
+            spend,
+            reach,
+            frequency,
+            conversions,
+            is_latest
+          )
+        `)
         .eq('id', campaignId)
         .eq('user_id', user.id)
+        .eq('campaign_metrics.is_latest', true)
         .single();
 
       if (campaignError || !campaign) {
         return NextResponse.json(
-          { error: 'Campaign not found' },
+          { error: 'Campaign not found or no metrics available' },
           { status: 404 }
         );
       }
 
       const thresholds = await alertDetector.getUserThresholds(user.id);
-      alerts = await alertDetector['checkCampaignIssues'](campaign, thresholds);
+      alerts = await alertDetector.checkCampaignIssues(campaign, thresholds);
       
       if (alerts.length > 0) {
-        await alertDetector['storeAlerts'](alerts, user.id);
+        await alertDetector.storeAlerts(alerts, user.id);
       }
     } else {
       // Generate alerts for all user campaigns
       alerts = await alertDetector.detectCampaignIssues(user.id);
-    }
-
-    // Send WhatsApp alerts if any were generated
-    if (alerts.length > 0) {
-      await alertDetector.sendWhatsAppAlerts(user.id, alerts);
     }
 
     return NextResponse.json({

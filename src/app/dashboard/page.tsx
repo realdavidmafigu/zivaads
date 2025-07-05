@@ -24,7 +24,8 @@ import {
   SparklesIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  ClockIcon
+  ClockIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { getRecentAIDailyAlerts } from '@/lib/ai-daily-alerts';
 
@@ -48,6 +49,9 @@ export default function DashboardPage() {
   const [aiReports, setAiReports] = useState<any[]>([]);
   const [aiReportsLoading, setAiReportsLoading] = useState<boolean>(true);
   const [recentAIAlerts, setRecentAIAlerts] = useState<any[]>([]);
+  const [syncing, setSyncing] = useState<boolean>(false);
+  const [syncProgress, setSyncProgress] = useState<string>('');
+  const [permissionWarning, setPermissionWarning] = useState<string>('');
 
   // Function to get personalized greeting based on time
   const getGreeting = () => {
@@ -178,7 +182,7 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    async function fetchAccounts() {
+    const fetchAccounts = async () => {
       setAccountsLoading(true);
       setAccountsError(null);
       try {
@@ -193,7 +197,7 @@ export default function DashboardPage() {
         setAccountsError('Failed to fetch accounts');
       }
       setAccountsLoading(false);
-    }
+    };
     fetchAccounts();
   }, []);
 
@@ -289,6 +293,103 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSyncFacebookData = async () => {
+    setSyncing(true);
+    setSyncProgress('Starting sync...');
+    try {
+      console.log('🔄 Starting manual Facebook data sync...');
+      
+      // Create a timeout promise for the fetch request
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 300000); // 5 minutes
+      });
+      
+      setSyncProgress('Connecting to Facebook...');
+      
+      // Call the recent sync endpoint for available data
+      const fetchPromise = fetch('/api/sync-facebook-recent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      // Race between the fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log('✅ Sync completed:', result);
+        setSyncProgress('Sync completed!');
+        
+        // Check for permission errors and set warning
+        if (result.results?.errors?.length > 0) {
+          const permissionErrors = result.results.errors.filter((error: string) => 
+            error.includes('Permission denied') || error.includes('permission')
+          );
+          if (permissionErrors.length > 0) {
+            setPermissionWarning('Some Facebook accounts have permission issues. Please reconnect your Facebook account to refresh permissions.');
+          }
+        } else {
+          setPermissionWarning(''); // Clear warning if no permission errors
+        }
+        
+        // Show success message with details
+        const message = result.results?.errors?.length > 0 
+          ? `Sync completed with some issues. ${result.results.dataAvailability}`
+          : 'Facebook data sync completed successfully!';
+        
+        alert(message);
+        
+        // Refresh the accounts and campaigns data
+        setSyncProgress('Refreshing data...');
+        setAccountsLoading(true);
+        setAccountsError(null);
+        try {
+          const res = await fetch('/api/debug/facebook-accounts');
+          const data = await res.json();
+          if (res.ok) {
+            setAccounts(data.activeAccounts || []);
+          } else {
+            setAccountsError(data.error || 'Failed to fetch accounts');
+          }
+        } catch (err) {
+          setAccountsError('Failed to fetch accounts');
+        }
+        setAccountsLoading(false);
+        
+        // Wait a moment for the sync to complete, then refresh campaigns
+        setTimeout(async () => {
+          if (selectedAccount) {
+            const params = [];
+            if (selectedAccount !== 'all') params.push(`account_id=${selectedAccount}`);
+            const res = await fetch(`/api/facebook/campaigns?${params.join('&')}`);
+            const data = await res.json();
+            if (res.ok) {
+              setCampaigns(data.data || []);
+            }
+          }
+        }, 2000);
+        
+      } else {
+        console.error('❌ Sync failed:', result);
+        const errorMessage = result.error || 'Unknown error occurred during sync';
+        alert(`Sync failed: ${errorMessage}`);
+      }
+    } catch (error) {
+      console.error('❌ Sync error:', error);
+      if (error instanceof Error && error.message === 'Request timeout') {
+        alert('Sync request timed out. The process may still be running in the background. Please check back later.');
+      } else {
+        alert('Failed to sync Facebook data. Please check your connection and try again.');
+      }
+    } finally {
+      // Always ensure syncing state is reset
+      setSyncing(false);
+      setSyncProgress('');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -346,6 +447,33 @@ export default function DashboardPage() {
 
 
 
+        {/* Permission Warning */}
+        {permissionWarning && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">{permissionWarning}</p>
+              </div>
+              <div className="ml-auto pl-3">
+                <button
+                  onClick={() => setPermissionWarning('')}
+                  className="inline-flex text-yellow-400 hover:text-yellow-500"
+                >
+                  <span className="sr-only">Dismiss</span>
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Account Selection & Filters */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -394,6 +522,15 @@ export default function DashboardPage() {
                 />
                 <span className="text-sm font-medium text-gray-700">Simple Mode</span>
               </label>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <button
+                onClick={handleSyncFacebookData}
+                disabled={syncing}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                <ArrowPathIcon className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                <span>{syncing ? (syncProgress || 'Syncing...') : 'Sync Data'}</span>
+              </button>
               <div className="h-4 w-px bg-gray-300"></div>
               <button
                 onClick={() => router.push('/dashboard/connect-facebook')}
@@ -474,6 +611,14 @@ export default function DashboardPage() {
               <span className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full">
                 {campaigns.length} Campaigns • Enhanced View
               </span>
+              <button
+                onClick={handleSyncFacebookData}
+                disabled={syncing}
+                className="flex items-center space-x-2 px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full hover:bg-white/30 disabled:bg-white/10 disabled:cursor-not-allowed transition-colors"
+              >
+                <ArrowPathIcon className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                <span>{syncing ? (syncProgress || 'Syncing...') : 'Refresh'}</span>
+              </button>
               <button
                 onClick={() => router.push('/dashboard/campaigns')}
                 className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full hover:bg-white/30 transition-colors"

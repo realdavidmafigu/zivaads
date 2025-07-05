@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase';
 import { generateAIPerformanceReport } from '@/lib/ai-alerts';
+import { whatsappClient } from '@/lib/whatsapp';
 
 export async function POST(request: NextRequest) {
   try {
@@ -200,19 +201,34 @@ function getCurrentReportType(): 'morning' | 'afternoon' | 'evening' {
 // Helper function to send WhatsApp report
 async function sendWhatsAppReport(userId: string, report: any) {
   try {
-    const { sendWhatsAppAlert } = await import('@/lib/whatsapp');
-    
-    const alertData = {
-      campaign_name: `${report.reportType.charAt(0).toUpperCase() + report.reportType.slice(1)} Report`,
-      summary: report.summary,
-      details: report.content,
-      recommendations: report.recommendations.join(', '),
-      total_spend: report.totalSpend,
-      campaign_count: report.campaignCount,
-    };
+    // Fetch user's WhatsApp phone number from preferences
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+        },
+      }
+    );
+    const { data: preferences } = await supabase
+      .from('user_alert_preferences')
+      .select('phone_number')
+      .eq('user_id', userId)
+      .single();
 
-    // Use test_message template for now, we can create a specific template later
-    await sendWhatsAppAlert(userId, 'test_message', alertData);
+    if (!preferences?.phone_number) {
+      console.log(`No WhatsApp phone number for user ${userId}, skipping WhatsApp report.`);
+      return;
+    }
+
+    // Compose a simple summary message
+    const message = `📊 ZivaAds Performance Report\n\nType: ${report.reportType}\nCampaigns: ${report.campaignCount}\nTotal Spend: $${report.totalSpend}\n\nSummary: ${report.summary}\n\nRecommendations: ${report.recommendations?.join(', ') || ''}`;
+
+    await whatsappClient.sendTextMessage(preferences.phone_number, message);
   } catch (error) {
     console.error('Error sending WhatsApp report:', error);
   }

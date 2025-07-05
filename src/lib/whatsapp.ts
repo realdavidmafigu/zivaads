@@ -1,135 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase';
-import { WHATSAPP_CONFIG, WHATSAPP_ENDPOINTS, WHATSAPP_TEMPLATES, ALERT_MESSAGES } from '@/config/whatsapp';
-
-// Message templates for different alert types
-const ALERT_TEMPLATES = {
-  budget_depleted: {
-    name: WHATSAPP_TEMPLATES.budget_alert,
-    language: WHATSAPP_CONFIG.defaultLanguage,
-    components: [
-      {
-        type: 'header',
-        text: ALERT_MESSAGES.budget_depleted.header
-      },
-      {
-        type: 'body',
-        text: ALERT_MESSAGES.budget_depleted.body
-      },
-      {
-        type: 'button',
-        sub_type: 'quick_reply',
-        index: 0,
-        parameters: [
-          {
-            type: 'text',
-            text: ALERT_MESSAGES.budget_depleted.button
-          }
-        ]
-      }
-    ]
-  },
-  low_ctr: {
-    name: WHATSAPP_TEMPLATES.ctr_alert,
-    language: WHATSAPP_CONFIG.defaultLanguage,
-    components: [
-      {
-        type: 'header',
-        text: ALERT_MESSAGES.low_ctr.header
-      },
-      {
-        type: 'body',
-        text: ALERT_MESSAGES.low_ctr.body
-      },
-      {
-        type: 'button',
-        sub_type: 'quick_reply',
-        index: 0,
-        parameters: [
-          {
-            type: 'text',
-            text: ALERT_MESSAGES.low_ctr.button
-          }
-        ]
-      }
-    ]
-  },
-  high_costs: {
-    name: WHATSAPP_TEMPLATES.cost_alert,
-    language: WHATSAPP_CONFIG.defaultLanguage,
-    components: [
-      {
-        type: 'header',
-        text: ALERT_MESSAGES.high_costs.header
-      },
-      {
-        type: 'body',
-        text: ALERT_MESSAGES.high_costs.body
-      },
-      {
-        type: 'button',
-        sub_type: 'quick_reply',
-        index: 0,
-        parameters: [
-          {
-            type: 'text',
-            text: ALERT_MESSAGES.high_costs.button
-          }
-        ]
-      }
-    ]
-  },
-  campaign_paused: {
-    name: WHATSAPP_TEMPLATES.status_alert,
-    language: WHATSAPP_CONFIG.defaultLanguage,
-    components: [
-      {
-        type: 'header',
-        text: ALERT_MESSAGES.campaign_paused.header
-      },
-      {
-        type: 'body',
-        text: ALERT_MESSAGES.campaign_paused.body
-      },
-      {
-        type: 'button',
-        sub_type: 'quick_reply',
-        index: 0,
-        parameters: [
-          {
-            type: 'text',
-            text: ALERT_MESSAGES.campaign_paused.button
-          }
-        ]
-      }
-    ]
-  },
-  test_message: {
-    name: WHATSAPP_TEMPLATES.test_alert,
-    language: WHATSAPP_CONFIG.defaultLanguage,
-    components: [
-      {
-        type: 'header',
-        text: ALERT_MESSAGES.test_message.header
-      },
-      {
-        type: 'body',
-        text: ALERT_MESSAGES.test_message.body
-      },
-      {
-        type: 'button',
-        sub_type: 'quick_reply',
-        index: 0,
-        parameters: [
-          {
-            type: 'text',
-            text: ALERT_MESSAGES.test_message.button
-          }
-        ]
-      }
-    ]
-  }
-};
+import { WHATSAPP_CONFIG, WHATSAPP_ENDPOINTS } from '@/config/whatsapp';
 
 // Rate limiting storage
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
@@ -171,11 +42,11 @@ export class WhatsAppClient {
   }
 
   /**
-   * Check rate limits for a phone number
+   * Check rate limiting for a phone number
    */
   private checkRateLimit(phoneNumber: string): boolean {
     const now = Date.now();
-    const key = `whatsapp_${phoneNumber}`;
+    const key = phoneNumber;
     const limit = rateLimitStore.get(key);
 
     if (!limit || now > limit.resetTime) {
@@ -196,27 +67,20 @@ export class WhatsAppClient {
    */
   async sendMessage(phoneNumber: string, message: WhatsAppMessage): Promise<boolean> {
     try {
-      // Check rate limits
+      // Check rate limiting
       if (!this.checkRateLimit(phoneNumber)) {
-        console.log('Rate limit exceeded for phone number:', phoneNumber);
+        console.error('Rate limit exceeded for phone number:', phoneNumber);
         return false;
-      }
-
-      // In test mode, just log the message
-      if (WHATSAPP_CONFIG.isTestMode || this.accessToken === 'test_access_token_for_development') {
-        console.log('📱 WhatsApp Test Mode - Message would be sent to:', phoneNumber);
-        console.log('📱 Message content:', JSON.stringify(message, null, 2));
-        return true;
       }
 
       // Format phone number
       const formattedPhone = this.formatPhoneNumber(phoneNumber);
 
-      const response = await fetch(WHATSAPP_ENDPOINTS.messages, {
+      const response = await fetch(WHATSAPP_ENDPOINTS.messages(), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           ...message,
@@ -224,13 +88,13 @@ export class WhatsAppClient {
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('WhatsApp API Error:', errorData);
+      const result = await response.json();
+
+      if (result.error) {
+        console.error('WhatsApp API Error:', result.error);
         return false;
       }
 
-      const result = await response.json();
       console.log('WhatsApp message sent successfully:', result);
       return true;
     } catch (error) {
@@ -255,7 +119,7 @@ export class WhatsAppClient {
       template: {
         name: templateName,
         language,
-        components,
+        ...(components && { components }),
       },
     };
 
@@ -279,49 +143,10 @@ export class WhatsAppClient {
   }
 
   /**
-   * Send an alert using the appropriate template
-   */
-  async sendAlert(
-    phoneNumber: string,
-    alertType: keyof typeof ALERT_TEMPLATES,
-    alertData: AlertData
-  ): Promise<boolean> {
-    try {
-      const template = ALERT_TEMPLATES[alertType];
-      if (!template) {
-        console.error('Unknown alert type:', alertType);
-        return false;
-      }
-
-      // Replace placeholders in the template
-      const processedComponents = template.components?.map(component => {
-        if (component.type === 'body' && component.text) {
-          let processedText = component.text;
-          Object.entries(alertData).forEach(([key, value]) => {
-            processedText = processedText.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-          });
-          return { ...component, text: processedText };
-        }
-        return component;
-      });
-
-      return this.sendTemplateMessage(
-        phoneNumber,
-        template.name,
-        template.language,
-        processedComponents
-      );
-    } catch (error) {
-      console.error('Error sending alert:', error);
-      return false;
-    }
-  }
-
-  /**
    * Send a test message
    */
   async sendTestMessage(phoneNumber: string): Promise<boolean> {
-    return this.sendAlert(phoneNumber, 'test_message', { campaign_name: 'Test Campaign' });
+    return this.sendTextMessage(phoneNumber, '🧪 Test message from ZivaAds! Your WhatsApp integration is working correctly.');
   }
 
   /**
@@ -332,8 +157,15 @@ export class WhatsAppClient {
     let cleaned = phoneNumber.replace(/\D/g, '');
     
     // Add country code if not present
-    if (!cleaned.startsWith('27')) {
-      cleaned = '27' + cleaned;
+    // Check for Zimbabwe numbers (263) first, then South Africa (27)
+    if (!cleaned.startsWith('263') && !cleaned.startsWith('27')) {
+      // If it's a 9-digit number starting with 7, it's likely Zimbabwe
+      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+        cleaned = '263' + cleaned;
+      } else {
+        // Default to South Africa
+        cleaned = '27' + cleaned;
+      }
     }
     
     return cleaned;
@@ -348,102 +180,66 @@ export class WhatsAppClient {
   }
 
   /**
-   * Get user preferences
+   * Store user interaction for 24-hour session
    */
-  async getUserPreferences(userId: string): Promise<any> {
+  async storeUserInteraction(phoneNumber: string, messageText: string): Promise<void> {
     try {
-      const { data, error } = await this.supabase
-        .from('user_alert_preferences')
+      // Check if user exists in subscribers table
+      const { data: existingUser } = await this.supabase
+        .from('whatsapp_subscribers')
         .select('*')
-        .eq('user_id', userId)
+        .eq('phone_number', phoneNumber)
         .single();
 
-      if (error) {
-        console.error('Error fetching user preferences:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching user preferences:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Check if user has enabled WhatsApp alerts
-   */
-  async isWhatsAppEnabled(userId: string): Promise<boolean> {
-    try {
-      const preferences = await this.getUserPreferences(userId);
-      return preferences?.whatsapp_enabled === true;
-    } catch (error) {
-      console.error('Error checking WhatsApp enabled status:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Check if current time is in quiet hours
-   */
-  async isInQuietHours(userId: string): Promise<boolean> {
-    try {
-      const preferences = await this.getUserPreferences(userId);
-      if (!preferences?.quiet_hours_enabled) {
-        return false;
-      }
-
-      const now = new Date();
-      const currentHour = now.getHours();
-      const startHour = preferences.quiet_hours_start || 22;
-      const endHour = preferences.quiet_hours_end || 8;
-
-      if (startHour <= endHour) {
-        return currentHour >= startHour && currentHour < endHour;
+      if (existingUser) {
+        // Update existing user's last message time
+        await this.supabase
+          .from('whatsapp_subscribers')
+          .update({
+            last_message_at: new Date().toISOString(),
+            message_count: existingUser.message_count + 1
+          })
+          .eq('phone_number', phoneNumber);
       } else {
-        // Quiet hours span midnight
-        return currentHour >= startHour || currentHour < endHour;
+        // Add new user
+        await this.supabase
+          .from('whatsapp_subscribers')
+          .insert({
+            phone_number: phoneNumber,
+            first_message: messageText,
+            subscribed_at: new Date().toISOString(),
+            last_message_at: new Date().toISOString(),
+            is_active: true,
+            message_count: 1
+          });
       }
     } catch (error) {
-      console.error('Error checking quiet hours:', error);
-      return false;
+      console.error('Error storing user interaction:', error);
     }
   }
 
   /**
-   * Send alert with user preferences
+   * Check if user is within 24-hour session window
    */
-  async sendAlertWithPreferences(
-    userId: string,
-    alertType: keyof typeof ALERT_TEMPLATES,
-    alertData: AlertData
-  ): Promise<boolean> {
+  async isWithinSessionWindow(phoneNumber: string): Promise<boolean> {
     try {
-      // Check if WhatsApp is enabled
-      const isEnabled = await this.isWhatsAppEnabled(userId);
-      if (!isEnabled) {
-        console.log(`WhatsApp alerts disabled for user ${userId}`);
+      const { data: user } = await this.supabase
+        .from('whatsapp_subscribers')
+        .select('last_message_at')
+        .eq('phone_number', phoneNumber)
+        .single();
+
+      if (!user) {
         return false;
       }
 
-      // Check quiet hours
-      const inQuietHours = await this.isInQuietHours(userId);
-      if (inQuietHours) {
-        console.log(`User ${userId} is in quiet hours, skipping WhatsApp alert`);
-        return false;
-      }
+      const lastMessage = new Date(user.last_message_at);
+      const now = new Date();
+      const hoursSinceLastMessage = (now.getTime() - lastMessage.getTime()) / (1000 * 60 * 60);
 
-      // Get user's phone number
-      const preferences = await this.getUserPreferences(userId);
-      if (!preferences?.phone_number) {
-        console.log(`No phone number found for user ${userId}`);
-        return false;
-      }
-
-      // Send the alert
-      return await this.sendAlert(preferences.phone_number, alertType, alertData);
+      return hoursSinceLastMessage <= 24;
     } catch (error) {
-      console.error('Error sending alert with preferences:', error);
+      console.error('Error checking session window:', error);
       return false;
     }
   }
@@ -453,11 +249,8 @@ export class WhatsAppClient {
 export const whatsappClient = new WhatsAppClient();
 
 // Export convenience functions
-export const sendWhatsAppAlert = (
-  userId: string,
-  alertType: keyof typeof ALERT_TEMPLATES,
-  alertData: AlertData
-) => whatsappClient.sendAlertWithPreferences(userId, alertType, alertData);
+export const sendWhatsAppMessage = (phoneNumber: string, text: string) => 
+  whatsappClient.sendTextMessage(phoneNumber, text);
 
-export const sendTestWhatsAppMessage = (userId: string) => 
-  whatsappClient.sendAlertWithPreferences(userId, 'test_message', { campaign_name: 'Test Campaign' }); 
+export const sendTestWhatsAppMessage = (phoneNumber: string) => 
+  whatsappClient.sendTestMessage(phoneNumber); 

@@ -67,10 +67,8 @@ export async function POST(request: NextRequest) {
         
         if (alerts.length > 0) {
           results.alerts_generated += alerts.length;
-          
-          // Send WhatsApp alerts
-          await alertDetector.sendWhatsAppAlerts(user.id, alerts);
-          results.whatsapp_sent += alerts.length;
+          // WhatsApp alert sending removed in new system
+          // If you want to notify users, use whatsappClient.sendTextMessage here
         }
 
       } catch (error) {
