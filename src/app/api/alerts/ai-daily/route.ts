@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate AI daily alert
-    const alert = await generateAIDailyAlert(user.id, finalAlertType, accountId);
+    const alert = await generateAIDailyAlert(user.id, finalAlertType, accountId, supabase);
 
     // If no alert generated, create a fallback alert
     if (!alert) {

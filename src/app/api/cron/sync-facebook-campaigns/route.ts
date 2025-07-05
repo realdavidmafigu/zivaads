@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Get all users with connected Facebook accounts
     const { data: fbAccounts, error: fbAccountsError } = await supabase
       .from('facebook_accounts')
-      .select('user_id, access_token, facebook_account_id')
+      .select('user_id, access_token, facebook_account_id, id')
       .eq('is_active', true);
 
     if (fbAccountsError) {
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     }
 
     let totalCampaigns = 0;
+    let totalMetrics = 0;
     let totalErrors = 0;
     let errors: string[] = [];
 
@@ -43,33 +44,103 @@ export async function POST(request: NextRequest) {
 
         // Upsert campaigns into Supabase
         if (campaigns && campaigns.length > 0) {
-          const upsertData = campaigns.map((c: any) => ({
-            id: c.id,
-            user_id: account.user_id,
-            facebook_account_id: account.facebook_account_id,
-            name: c.name,
-            status: c.status,
-            objective: c.objective,
-            created_time: c.created_time,
-            start_time: c.start_time,
-            stop_time: c.stop_time,
-            daily_budget: c.daily_budget,
-            lifetime_budget: c.lifetime_budget,
-            spend_cap: c.spend_cap,
-            special_ad_categories: c.special_ad_categories,
-            last_sync_at: new Date().toISOString(),
-          }));
+          for (const campaign of campaigns) {
+            try {
+              // Get campaign insights for metrics
+              const insights = await facebookClient.getCampaignInsights(campaign.id);
+              
+              // Upsert campaign metadata (NO performance metrics here)
+              const { data: campaignData, error: campaignError } = await supabase
+                .from('campaigns')
+                .upsert({
+                  user_id: account.user_id,
+                  facebook_account_id: account.id,
+                  facebook_campaign_id: campaign.id,
+                  name: campaign.name,
+                  status: campaign.status,
+                  objective: campaign.objective,
+                  created_time: campaign.created_time,
+                  start_time: campaign.start_time,
+                  stop_time: campaign.stop_time,
+                  daily_budget: campaign.daily_budget,
+                  lifetime_budget: campaign.lifetime_budget,
+                  spend_cap: campaign.spend_cap,
+                  special_ad_categories: campaign.special_ad_categories,
+                  last_sync_at: new Date().toISOString(),
+                }, { onConflict: 'facebook_account_id,facebook_campaign_id' })
+                .select('id')
+                .single();
 
-          const { error: upsertError } = await supabase
-            .from('campaigns')
-            .upsert(upsertData, { onConflict: 'id' });
+              if (campaignError) {
+                totalErrors++;
+                errors.push(`Campaign upsert error for ${campaign.name}: ${campaignError.message}`);
+                console.error('Campaign upsert error:', campaignError);
+                continue;
+              }
 
-          if (upsertError) {
-            totalErrors++;
-            errors.push(`Upsert error for user ${account.user_id}: ${upsertError.message}`);
-            console.error('Upsert error:', upsertError);
-          } else {
-            totalCampaigns += campaigns.length;
+              totalCampaigns++;
+
+              // Store performance metrics in campaign_metrics table
+              if (insights && campaignData) {
+                const now = new Date();
+                const currentHour = now.getHours();
+                const currentDate = now.toISOString().split('T')[0];
+
+                // Calculate additional metrics
+                let link_clicks = 0;
+                let whatsapp_clicks = 0;
+                let cpc_link = 0;
+                let cpc_whatsapp = 0;
+
+                if (insights.actions) {
+                  const linkClickAction = insights.actions.find((action: any) => action.action_type === 'link_click');
+                  if (linkClickAction && Number(linkClickAction.value) > 0) {
+                    link_clicks = Number(linkClickAction.value);
+                    cpc_link = Number(insights.spend) / link_clicks;
+                  }
+                  const waClickAction = insights.actions.find((action: any) => action.action_type === 'click_to_whatsapp');
+                  if (waClickAction && Number(waClickAction.value) > 0) {
+                    whatsapp_clicks = Number(waClickAction.value);
+                    cpc_whatsapp = Number(insights.spend) / whatsapp_clicks;
+                  }
+                }
+
+                const { error: metricsError } = await supabase
+                  .from('campaign_metrics')
+                  .upsert({
+                    campaign_id: campaignData.id,
+                    metric_timestamp: now.toISOString(),
+                    metric_date: currentDate,
+                    metric_hour: currentHour,
+                    impressions: insights.impressions || 0,
+                    clicks: insights.clicks || 0,
+                    ctr: insights.ctr || 0,
+                    cpc: insights.cpc || 0,
+                    cpm: insights.cpm || 0,
+                    spend: insights.spend || 0,
+                    reach: insights.reach || 0,
+                    frequency: insights.frequency || 0,
+                    conversions: insights.actions?.find((action: any) => action.action_type === 'purchase')?.value || 0,
+                    link_clicks,
+                    whatsapp_clicks,
+                    cpc_link,
+                    cpc_whatsapp,
+                    data_source: 'facebook_api',
+                    is_latest: true // This will be managed by the trigger
+                  }, { onConflict: 'campaign_id,metric_date,metric_hour' });
+
+                if (metricsError) {
+                  console.error(`Error storing metrics for campaign ${campaign.name}:`, metricsError);
+                } else {
+                  totalMetrics++;
+                }
+              }
+
+            } catch (campaignError) {
+              totalErrors++;
+              errors.push(`Error processing campaign ${campaign.name}: ${campaignError instanceof Error ? campaignError.message : 'Unknown error'}`);
+              console.error('Error processing campaign:', campaignError);
+            }
           }
         }
       } catch (err: any) {
@@ -82,6 +153,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       totalCampaigns,
+      totalMetrics,
       totalErrors,
       errors,
       timestamp: new Date().toISOString(),

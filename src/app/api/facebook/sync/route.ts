@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
                 // Get campaign insights
                 const insights = await facebookClient.getCampaignInsights(campaign.id);
                 
-                // Upsert campaign
-                const { error: campaignError } = await supabase
+                // Upsert campaign metadata (NO performance metrics here)
+                const { data: campaignData, error: campaignError } = await supabase
                   .from('campaigns')
                   .upsert({
                     user_id: user.id,
@@ -105,17 +105,10 @@ export async function POST(request: NextRequest) {
                     start_time: campaign.start_time,
                     stop_time: campaign.stop_time,
                     special_ad_categories: campaign.special_ad_categories,
-                    impressions: insights?.impressions || 0,
-                    clicks: insights?.clicks || 0,
-                    ctr: insights?.ctr || 0,
-                    cpc: insights?.cpc || 0,
-                    cpm: insights?.cpm || 0,
-                    spend: insights?.spend || 0,
-                    reach: insights?.reach || 0,
-                    frequency: insights?.frequency || 0,
-                    conversions: insights?.actions?.find((action: any) => action.action_type === 'purchase')?.value || 0,
                     last_sync_at: new Date().toISOString()
-                  }, { onConflict: 'facebook_account_id,facebook_campaign_id' });
+                  }, { onConflict: 'facebook_account_id,facebook_campaign_id' })
+                  .select('id')
+                  .single();
 
                 if (campaignError) {
                   syncResults.errors.push(`Failed to sync campaign ${campaign.name}: ${campaignError.message}`);
@@ -123,13 +116,38 @@ export async function POST(request: NextRequest) {
                   syncResults.campaigns_synced++;
                 }
 
-                // Store performance snapshot
-                if (insights) {
-                  const { error: snapshotError } = await supabase
-                    .from('performance_snapshots')
+                // Store performance metrics in campaign_metrics table
+                if (insights && campaignData) {
+                  const now = new Date();
+                  const currentHour = now.getHours();
+                  const currentDate = now.toISOString().split('T')[0];
+
+                  // Calculate additional metrics
+                  let link_clicks = 0;
+                  let whatsapp_clicks = 0;
+                  let cpc_link = 0;
+                  let cpc_whatsapp = 0;
+
+                  if (insights.actions) {
+                    const linkClickAction = insights.actions.find((action: any) => action.action_type === 'link_click');
+                    if (linkClickAction && Number(linkClickAction.value) > 0) {
+                      link_clicks = Number(linkClickAction.value);
+                      cpc_link = Number(insights.spend) / link_clicks;
+                    }
+                    const waClickAction = insights.actions.find((action: any) => action.action_type === 'click_to_whatsapp');
+                    if (waClickAction && Number(waClickAction.value) > 0) {
+                      whatsapp_clicks = Number(waClickAction.value);
+                      cpc_whatsapp = Number(insights.spend) / whatsapp_clicks;
+                    }
+                  }
+
+                  const { error: metricsError } = await supabase
+                    .from('campaign_metrics')
                     .upsert({
-                      campaign_id: account.id, // This should be the campaign UUID, but we need to get it
-                      snapshot_date: new Date().toISOString().split('T')[0],
+                      campaign_id: campaignData.id,
+                      metric_timestamp: now.toISOString(),
+                      metric_date: currentDate,
+                      metric_hour: currentHour,
                       impressions: insights.impressions || 0,
                       clicks: insights.clicks || 0,
                       ctr: insights.ctr || 0,
@@ -138,24 +156,33 @@ export async function POST(request: NextRequest) {
                       spend: insights.spend || 0,
                       reach: insights.reach || 0,
                       frequency: insights.frequency || 0,
-                      conversions: insights.actions?.find((action: any) => action.action_type === 'purchase')?.value || 0
-                    }, { onConflict: 'campaign_id,snapshot_date' });
+                      conversions: insights.actions?.find((action: any) => action.action_type === 'purchase')?.value || 0,
+                      link_clicks,
+                      whatsapp_clicks,
+                      cpc_link,
+                      cpc_whatsapp,
+                      data_source: 'facebook_api',
+                      is_latest: true // This will be managed by the trigger
+                    }, { onConflict: 'campaign_id,metric_date,metric_hour' });
 
-                  if (!snapshotError) {
+                  if (!metricsError) {
                     syncResults.insights_synced++;
+                  } else {
+                    console.error(`Error storing metrics for campaign ${campaign.name}:`, metricsError);
                   }
                 }
 
                 // Sync ad sets if requested
-                if (sync_type === 'all' || sync_type === 'ad_sets') {
+                if ((sync_type === 'all' || sync_type === 'ad_sets') && campaignData) {
                   try {
                     const adSets = await facebookClient.getAdSets(campaign.id);
                     
                     for (const adSet of adSets) {
-                      const { error: adSetError } = await supabase
+                      // Upsert ad set metadata
+                      const { data: adSetData, error: adSetError } = await supabase
                         .from('ad_sets')
                         .upsert({
-                          campaign_id: account.id, // This should be the campaign UUID
+                          campaign_id: campaignData.id, // Use the campaign UUID
                           facebook_ad_set_id: adSet.id,
                           name: adSet.name,
                           status: adSet.status,
@@ -168,7 +195,9 @@ export async function POST(request: NextRequest) {
                           start_time: adSet.start_time,
                           end_time: adSet.end_time,
                           last_sync_at: new Date().toISOString()
-                        }, { onConflict: 'campaign_id,facebook_ad_set_id' });
+                        }, { onConflict: 'campaign_id,facebook_ad_set_id' })
+                        .select('id')
+                        .single();
 
                       if (adSetError) {
                         syncResults.errors.push(`Failed to sync ad set ${adSet.name}: ${adSetError.message}`);
@@ -177,7 +206,7 @@ export async function POST(request: NextRequest) {
                       }
 
                       // Sync ads if requested
-                      if (sync_type === 'all' || sync_type === 'ads') {
+                      if ((sync_type === 'all' || sync_type === 'ads') && adSetData) {
                         try {
                           const ads = await facebookClient.getAds(adSet.id);
                           
@@ -185,7 +214,7 @@ export async function POST(request: NextRequest) {
                             const { error: adError } = await supabase
                               .from('ads')
                               .upsert({
-                                ad_set_id: account.id, // This should be the ad set UUID
+                                ad_set_id: adSetData.id, // Use the ad set UUID
                                 facebook_ad_id: ad.id,
                                 name: ad.name,
                                 status: ad.status,

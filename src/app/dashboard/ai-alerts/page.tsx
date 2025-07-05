@@ -5,7 +5,6 @@ import { createBrowserClient } from '@supabase/ssr';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase';
 import { BellIcon, ClockIcon, CheckIcon, XMarkIcon, PlayIcon } from '@heroicons/react/24/outline';
 import AIAlertPreferences from '@/components/AIAlertPreferences';
-import { getRecentAIDailyAlerts } from '@/lib/ai-daily-alerts';
 
 interface AIAlert {
   id: string;
@@ -70,15 +69,33 @@ export default function AIAlertsPage() {
   };
 
   const fetchRecentAIAlerts = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const alerts = await getRecentAIDailyAlerts(user.id, 5);
-    setRecentAIAlerts(alerts);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch recent AI alerts from the database
+      const { data, error } = await supabase
+        .from('ai_daily_alerts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('generated_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching recent AI alerts:', error);
+      } else {
+        setRecentAIAlerts(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching recent AI alerts:', error);
+    }
   };
 
   const testAlert = async (alertType: 'morning' | 'afternoon' | 'evening') => {
     try {
       setTestLoading(true);
+      setMessage('');
+      
       const response = await fetch('/api/alerts/ai-daily', {
         method: 'POST',
         headers: {
@@ -93,17 +110,26 @@ export default function AIAlertsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setMessage(`${alertType.charAt(0).toUpperCase() + alertType.slice(1)} test alert sent! Check your WhatsApp.`);
-        setTimeout(() => setMessage(''), 5000);
-        fetchAlerts(); // Refresh the alerts list
+        console.log('Test alert response:', data);
+        
+        if (data.success) {
+          setMessage(`${alertType.charAt(0).toUpperCase() + alertType.slice(1)} test alert generated successfully! Check the recent alerts below.`);
+          // Refresh the alerts list
+          await fetchRecentAIAlerts();
+        } else {
+          setMessage('Failed to generate test alert: ' + (data.error || 'Unknown error'));
+        }
       } else {
-        setMessage('Failed to send test alert');
+        const errorData = await response.json();
+        setMessage('Failed to send test alert: ' + (errorData.error || 'Server error'));
       }
     } catch (error) {
       console.error('Error sending test alert:', error);
-      setMessage('Error sending test alert');
+      setMessage('Error sending test alert: ' + (error as Error).message);
     } finally {
       setTestLoading(false);
+      // Clear message after 5 seconds
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -231,9 +257,17 @@ export default function AIAlertsPage() {
 
           {/* Recent Alerts */}
           <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-            <div className="flex items-center mb-4 sm:mb-6">
-              <ClockIcon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 mr-2 sm:mr-3" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Recent AI Alerts</h3>
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <div className="flex items-center">
+                <ClockIcon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 mr-2 sm:mr-3" />
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Recent AI Alerts</h3>
+              </div>
+              <button
+                onClick={fetchRecentAIAlerts}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Refresh
+              </button>
             </div>
 
             {recentAIAlerts.length === 0 ? (
@@ -257,9 +291,9 @@ export default function AIAlertsPage() {
                         {formatDate(alert.generated_at)}
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm text-gray-700 mb-2 line-clamp-2">{alert.content}</p>
+                    <p className="text-xs sm:text-sm text-gray-700 mb-2">{alert.content}</p>
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{alert.campaign_count} campaigns</span>
+                      <span>{alert.campaign_count || 0} campaigns</span>
                       <span>${alert.total_spend?.toFixed(2) ?? '0.00'} spent</span>
                     </div>
                   </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { FacebookCampaign, FacebookInsights } from '@/types';
 
-interface CampaignCardProps {
+interface EnhancedCampaignCardProps {
   campaign: FacebookCampaign;
   insights?: FacebookInsights;
   simpleMode?: boolean;
@@ -133,7 +133,7 @@ const Tooltip = ({ children, content }: { children: React.ReactNode, content: st
   );
 };
 
-const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, insights, simpleMode = false }) => {
+const EnhancedCampaignCard: React.FC<EnhancedCampaignCardProps> = ({ campaign, insights, simpleMode = false }) => {
   // Always convert possible string values to numbers
   const ctr = Number(campaign.ctr ?? insights?.ctr) || 0;
   const cpc = Number(campaign.cpc) || 0;
@@ -147,8 +147,8 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, insights, simpleM
   
   // Calculate derived values
   const performanceRibbon = getPerformanceRibbon(ctr, cpc);
-  const campaignType = getCampaignType(campaign.objective);
-  const duration = getCampaignDuration(campaign.start_time);
+  const campaignType = getCampaignType(campaign.objective || '');
+  const duration = getCampaignDuration(campaign.start_time || '');
   const healthScore = calculateHealthScore(ctr, cpc, campaign.status);
   const recommendedAction = getRecommendedAction(ctr, cpc, campaign.status, healthScore);
   
@@ -337,4 +337,4 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign, insights, simpleM
   );
 };
 
-export default CampaignCard; 
+export default EnhancedCampaignCard;

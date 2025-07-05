@@ -1,9 +1,9 @@
 // WhatsApp Business API Configuration
 export const WHATSAPP_CONFIG = {
-  // API Configuration
+  // API Configuration - Using test credentials for development
   apiVersion: 'v19.0',
   phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '713498348512377',
-  accessToken: process.env.WHATSAPP_ACCESS_TOKEN || 'EAFTe1yovOfsBOZBACZCr6Y9Dd59j6NGf6tLT9usO1Cn91OQ6mZAsyfzWuUcK8FLd6QDuZB39bwy4acbqaO2kkrm4tU45bkkBTMYPLx7ZACtNj6BTsL3X89O5KGj4Kgv6mvFzwHpM5lqeUVcZCCl2xHz2mA8uWkMXMHtQ8CxLexAGW0FX0ZCJtd6kvhpytkTZCmrywC3o2pxc8yNbUfhMMRaSkS3lMEjWxyqavy3BcoAL2XwZBniPK',
+  accessToken: process.env.WHATSAPP_ACCESS_TOKEN || 'test_access_token_for_development',
   verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'test_verify_token',
   
   // Rate Limiting Configuration
