@@ -52,7 +52,7 @@ export async function generateAIDailyAlert(
     console.log(`📊 All Facebook accounts (including inactive):`, {
       count: allFbAccounts?.length || 0,
       error: allFbError?.message || 'none',
-      accounts: allFbAccounts?.map(acc => ({ 
+      accounts: allFbAccounts?.map((acc: any) => ({ 
         id: acc.facebook_account_id, 
         name: acc.account_name, 
         is_active: acc.is_active 
@@ -68,7 +68,7 @@ export async function generateAIDailyAlert(
     console.log(`📊 Facebook accounts found:`, {
       count: fbAccounts?.length || 0,
       error: fbError?.message || 'none',
-      accounts: fbAccounts?.map(acc => ({ id: acc.facebook_account_id, name: acc.account_name })) || []
+      accounts: fbAccounts?.map((acc: any) => ({ id: acc.facebook_account_id, name: acc.account_name })) || []
     });
     
     if (fbError || !fbAccounts || fbAccounts.length === 0) {
@@ -85,7 +85,7 @@ export async function generateAIDailyAlert(
     // Find the selected account
     console.log(`🔍 Selecting account - requested accountId: ${accountId}`);
     const account = accountId
-      ? fbAccounts.find(acc => acc.facebook_account_id === accountId)
+      ? fbAccounts.find((acc: any) => acc.facebook_account_id === accountId)
       : fbAccounts[0];
     
     console.log(`📊 Selected account:`, {

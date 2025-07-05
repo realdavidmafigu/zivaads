@@ -28,7 +28,7 @@ const getCampaignType = (objective: string) => {
 };
 
 // Campaign duration calculation
-const getCampaignDuration = (startTime: string) => {
+const getCampaignDuration = (startTime?: string) => {
   if (!startTime) return 'Unknown duration';
   const start = new Date(startTime);
   const now = new Date();

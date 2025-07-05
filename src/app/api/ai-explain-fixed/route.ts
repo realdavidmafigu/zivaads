@@ -7,8 +7,13 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export async function POST(req: NextRequest) {
   let campaignCount = 0;
+  let metrics: any = null;
+  let campaigns: any[] = [];
+  
   try {
-    const { metrics, campaigns } = await req.json();
+    const requestData = await req.json();
+    metrics = requestData.metrics;
+    campaigns = requestData.campaigns || [];
     
     // Create a cache key based on the request data
     const cacheKey = JSON.stringify({ metrics, campaigns });
