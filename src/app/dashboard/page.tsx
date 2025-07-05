@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import AIInsights from '@/components/AIInsights';
 import CampaignCard from '@/components/CampaignCard';
+import EnhancedCampaignCard from '@/components/EnhancedCampaignCard';
 import CampaignInsights from '@/components/CampaignInsights';
 import AIPerformanceReports from '@/components/AIPerformanceReports';
 import LocalInsights from '@/components/LocalInsights';
@@ -226,10 +227,26 @@ export default function DashboardPage() {
   }, []);
 
   const fetchRecentAIAlerts = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const alerts = await getRecentAIDailyAlerts(user.id, 3);
-    setRecentAIAlerts(alerts);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      // Fetch recent AI alerts from the database
+      const { data, error } = await supabase
+        .from('ai_daily_alerts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('generated_at', { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.error('Error fetching recent AI alerts:', error);
+      } else {
+        setRecentAIAlerts(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching recent AI alerts:', error);
+    }
   };
 
   const handleTestAlert = async () => {
@@ -445,138 +462,155 @@ export default function DashboardPage() {
               </div>
         </div>
 
-      {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Campaigns */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Campaign Performance */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
-                <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <ChartBarIcon className="h-6 w-6 text-white" />
-                  <h2 className="text-xl font-bold text-white">Campaign Performance</h2>
-                  </div>
-                  <span className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full">
-                    {campaigns.length} Campaigns
-                  </span>
-                </div>
-              </div>
-              <div className="p-6">
-                {campaignsLoading ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="animate-pulse">
-                        <div className="h-20 bg-gray-200 rounded-lg"></div>
-                      </div>
-                    ))}
-                  </div>
-                ) : campaigns.length === 0 ? (
-                  <div className="text-center py-12">
-                    <ChartBarIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
-                    <p className="text-gray-600 mb-4">Connect your Facebook account to see your campaigns here.</p>
-                    <button
-                      onClick={() => router.push('/dashboard/connect-facebook')}
-                      className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <PlusIcon className="h-4 w-4" />
-                      <span>Connect Facebook</span>
-                    </button>
-                  </div>
-                ) : (
-        <div className="space-y-6">
-                    {campaigns.slice(0, 3).map((campaign) => (
-                      <div key={campaign.id} className="space-y-4">
-                        <CampaignCard campaign={campaign} simpleMode={simpleMode} />
-                        <CampaignInsights campaign={campaign} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+      {/* Campaign Performance - Full Width */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <ChartBarIcon className="h-6 w-6 text-white" />
+              <h2 className="text-xl font-bold text-white">Campaign Performance</h2>
             </div>
-
-
+            <div className="flex items-center space-x-4">
+              <span className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full">
+                {campaigns.length} Campaigns • Enhanced View
+              </span>
+              <button
+                onClick={() => router.push('/dashboard/campaigns')}
+                className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full hover:bg-white/30 transition-colors"
+              >
+                View All
+              </button>
+            </div>
           </div>
-
-          {/* Right Column - Sidebar */}
-          <div className="space-y-6">
-            {/* Facebook Connection Status */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className={`px-6 py-4 ${hasFacebook ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}>
-                <div className="flex items-center space-x-3">
-                  {hasFacebook ? (
-                    <CheckCircleIcon className="h-6 w-6 text-white" />
-                  ) : (
-                    <ClockIcon className="h-6 w-6 text-white" />
-                  )}
-                  <h3 className="text-lg font-bold text-white">
-                    {hasFacebook ? 'Facebook Connected' : 'Connect Facebook'}
-                  </h3>
+        </div>
+        <div className="p-6">
+          {campaignsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-64 bg-gray-200 rounded-xl"></div>
                 </div>
-              </div>
-              <div className="p-6">
-                <p className="text-sm text-gray-600 mb-4">
-                  {hasFacebook 
-                    ? 'Your Facebook Business account is connected and data is being synced automatically.'
-                    : 'Connect your Facebook Business account to start monitoring your ad performance in real-time.'
-                  }
-                </p>
-                <div className="space-y-2">
-                <button
-                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  onClick={() => hasFacebook ? router.push('/dashboard/connect-facebook') : router.push('/dashboard/connect-facebook')}
-                >
-                    {hasFacebook ? 'Manage Account' : 'Connect Account'}
-                </button>
-                  {hasFacebook && (
-                <button
-                      className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                  onClick={() => router.push('/dashboard/settings/alerts')}
-                >
-                  Settings
-                </button>
-                  )}
-                </div>
-              </div>
+              ))}
             </div>
+          ) : campaigns.length === 0 ? (
+            <div className="text-center py-12">
+              <ChartBarIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
+              <p className="text-gray-600 mb-4">Connect your Facebook account to see your campaigns here.</p>
+              <button
+                onClick={() => router.push('/dashboard/connect-facebook')}
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <PlusIcon className="h-4 w-4" />
+                <span>Connect Facebook</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {campaigns.slice(0, 8).map((campaign) => (
+                <EnhancedCampaignCard
+                  key={campaign.id}
+                  campaign={campaign}
+                  simpleMode={false}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
-            {/* Recent AI Alerts */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center mb-4">
-                <ClockIcon className="h-6 w-6 text-blue-600 mr-3" />
-                <h3 className="text-lg font-semibold text-gray-900">Recent AI Alerts</h3>
-              </div>
-              {recentAIAlerts.length === 0 ? (
-                <div className="text-center py-4">
-                  <BellIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No AI alerts yet</p>
-                </div>
+      {/* Quick Actions & Insights Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Facebook Connection Status - Compact */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className={`px-4 py-3 ${hasFacebook ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}>
+            <div className="flex items-center space-x-2">
+              {hasFacebook ? (
+                <CheckCircleIcon className="h-5 w-5 text-white" />
               ) : (
-              <div className="space-y-3">
-                  {recentAIAlerts.map((alert) => (
-                    <div key={alert.id} className="border border-gray-200 rounded-lg p-3">
-                      <div className="flex items-start justify-between mb-1">
-                        <div className="flex items-center">
-                          <span className="text-2xl mr-2">{alert.alert_type === 'morning' ? '🌅' : alert.alert_type === 'afternoon' ? '☀️' : alert.alert_type === 'evening' ? '🌙' : '📊'}</span>
-                          <span className="text-sm font-medium text-gray-900 capitalize">{alert.alert_type} Alert</span>
-                        </div>
-                        <span className="text-xs text-gray-500">{new Date(alert.generated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      <p className="text-xs text-gray-700 mb-1 line-clamp-2">{alert.content}</p>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{alert.campaign_count} campaigns</span>
-                        <span>${alert.total_spend?.toFixed(2) ?? '0.00'} spent</span>
-                  </div>
+                <ClockIcon className="h-5 w-5 text-white" />
+              )}
+              <h3 className="text-sm font-bold text-white">
+                {hasFacebook ? 'Connected' : 'Connect'}
+              </h3>
             </div>
-                  ))}
-                </div>
-                )}
-            </div>
+          </div>
+          <div className="p-4">
+            <p className="text-xs text-gray-600 mb-3">
+              {hasFacebook 
+                ? 'Facebook Business account connected'
+                : 'Connect to start monitoring'
+              }
+            </p>
+            <button
+              className="w-full bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              onClick={() => router.push('/dashboard/connect-facebook')}
+            >
+              {hasFacebook ? 'Manage' : 'Connect'}
+            </button>
+          </div>
+        </div>
 
-            {/* Local Market Insights */}
-            <LocalInsights />
+        {/* Recent AI Alerts - Compact */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center mb-3">
+            <ClockIcon className="h-5 w-5 text-blue-600 mr-2" />
+            <h3 className="text-sm font-semibold text-gray-900">AI Alerts</h3>
+          </div>
+          {recentAIAlerts.length === 0 ? (
+            <div className="text-center py-2">
+              <BellIcon className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">No alerts</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentAIAlerts.slice(0, 2).map((alert) => (
+                <div key={alert.id} className="border border-gray-200 rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-lg">{alert.alert_type === 'morning' ? '🌅' : alert.alert_type === 'afternoon' ? '☀️' : alert.alert_type === 'evening' ? '🌙' : '📊'}</span>
+                    <span className="text-xs text-gray-500">{new Date(alert.generated_at).toLocaleString('en-US', { month: 'short', day: 'numeric' })}</span>
+                  </div>
+                  <p className="text-xs text-gray-700 line-clamp-2">{alert.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Stats */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center mb-3">
+            <SparklesIcon className="h-5 w-5 text-purple-600 mr-2" />
+            <h3 className="text-sm font-semibold text-gray-900">Quick Stats</h3>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-600">Active:</span>
+              <span className="font-semibold">{activeCampaigns}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-600">Total Spend:</span>
+              <span className="font-semibold">${totalSpend.toFixed(0)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-600">Total Clicks:</span>
+              <span className="font-semibold">{totalClicks.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Local Market Insights - Compact */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center mb-3">
+            <EyeIcon className="h-5 w-5 text-green-600 mr-2" />
+            <h3 className="text-sm font-semibold text-gray-900">Market Insights</h3>
+          </div>
+          <div className="text-xs text-gray-600">
+            <p>Local market trends and competitor analysis</p>
+            <button className="mt-2 text-blue-600 hover:text-blue-700 font-medium">
+              View Details →
+            </button>
+          </div>
         </div>
       </div>
       </div>

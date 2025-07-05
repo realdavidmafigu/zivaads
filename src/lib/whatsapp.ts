@@ -198,31 +198,35 @@ export class WhatsAppClient {
     try {
       // Check rate limits
       if (!this.checkRateLimit(phoneNumber)) {
-        console.warn(`Rate limit exceeded for ${phoneNumber}`);
+        console.log('Rate limit exceeded for phone number:', phoneNumber);
         return false;
       }
 
-      // Format phone number (remove + and add country code if needed)
-      const formattedNumber = this.formatPhoneNumber(phoneNumber);
+      // In test mode, just log the message
+      if (WHATSAPP_CONFIG.isTestMode || this.accessToken === 'test_access_token_for_development') {
+        console.log('📱 WhatsApp Test Mode - Message would be sent to:', phoneNumber);
+        console.log('📱 Message content:', JSON.stringify(message, null, 2));
+        return true;
+      }
 
-      const response = await fetch(
-        `https://graph.facebook.com/${WHATSAPP_CONFIG.apiVersion}/${this.phoneNumberId}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...message,
-            to: formattedNumber,
-          }),
-        }
-      );
+      // Format phone number
+      const formattedPhone = this.formatPhoneNumber(phoneNumber);
+
+      const response = await fetch(WHATSAPP_ENDPOINTS.messages, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.accessToken}`,
+        },
+        body: JSON.stringify({
+          ...message,
+          to: formattedPhone,
+        }),
+      });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('WhatsApp API Error:', error);
+        const errorData = await response.json();
+        console.error('WhatsApp API Error:', errorData);
         return false;
       }
 
@@ -275,7 +279,7 @@ export class WhatsAppClient {
   }
 
   /**
-   * Send an alert message using templates
+   * Send an alert using the appropriate template
    */
   async sendAlert(
     phoneNumber: string,
@@ -285,23 +289,28 @@ export class WhatsAppClient {
     try {
       const template = ALERT_TEMPLATES[alertType];
       if (!template) {
-        console.error(`Template not found for alert type: ${alertType}`);
+        console.error('Unknown alert type:', alertType);
         return false;
       }
 
-      // Replace placeholders in template components
-      const components = template.components?.map(component => {
+      // Replace placeholders in the template
+      const processedComponents = template.components?.map(component => {
         if (component.type === 'body' && component.text) {
-          let text = component.text;
+          let processedText = component.text;
           Object.entries(alertData).forEach(([key, value]) => {
-            text = text.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+            processedText = processedText.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
           });
-          return { ...component, text };
+          return { ...component, text: processedText };
         }
         return component;
       });
 
-      return this.sendTemplateMessage(phoneNumber, template.name, template.language, components);
+      return this.sendTemplateMessage(
+        phoneNumber,
+        template.name,
+        template.language,
+        processedComponents
+      );
     } catch (error) {
       console.error('Error sending alert:', error);
       return false;
@@ -322,14 +331,9 @@ export class WhatsAppClient {
     // Remove all non-digit characters
     let cleaned = phoneNumber.replace(/\D/g, '');
     
-    // If it starts with 0, replace with country code
-    if (cleaned.startsWith('0')) {
-      cleaned = WHATSAPP_CONFIG.defaultCountryCode + cleaned.substring(1);
-    }
-    
-    // If it doesn't start with country code, add default country code
-    if (!cleaned.startsWith(WHATSAPP_CONFIG.defaultCountryCode)) {
-      cleaned = WHATSAPP_CONFIG.defaultCountryCode + cleaned;
+    // Add country code if not present
+    if (!cleaned.startsWith('27')) {
+      cleaned = '27' + cleaned;
     }
     
     return cleaned;
@@ -339,61 +343,75 @@ export class WhatsAppClient {
    * Verify webhook signature
    */
   verifyWebhookSignature(body: string, signature: string): boolean {
-    // Implement webhook signature verification if needed
-    // For now, return true (you should implement proper verification)
+    // Implement signature verification if needed
     return true;
   }
 
   /**
-   * Get user's WhatsApp preferences
+   * Get user preferences
    */
   async getUserPreferences(userId: string): Promise<any> {
-    const { data, error } = await this.supabase
-      .from('user_whatsapp_preferences')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    try {
+      const { data, error } = await this.supabase
+        .from('user_alert_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
 
-    if (error) {
-      console.error('Error fetching WhatsApp preferences:', error);
+      if (error) {
+        console.error('Error fetching user preferences:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching user preferences:', error);
       return null;
     }
-
-    return data;
   }
 
   /**
    * Check if user has enabled WhatsApp alerts
    */
   async isWhatsAppEnabled(userId: string): Promise<boolean> {
-    const preferences = await this.getUserPreferences(userId);
-    return preferences?.is_enabled && preferences?.phone_number;
-  }
-
-  /**
-   * Check quiet hours
-   */
-  async isInQuietHours(userId: string): Promise<boolean> {
-    const preferences = await this.getUserPreferences(userId);
-    if (!preferences?.quiet_hours_enabled) {
+    try {
+      const preferences = await this.getUserPreferences(userId);
+      return preferences?.whatsapp_enabled === true;
+    } catch (error) {
+      console.error('Error checking WhatsApp enabled status:', error);
       return false;
     }
+  }
 
-    const now = new Date();
-    const currentHour = now.getHours();
-    const startHour = preferences.quiet_hours_start || 22;
-    const endHour = preferences.quiet_hours_end || 8;
+  /**
+   * Check if current time is in quiet hours
+   */
+  async isInQuietHours(userId: string): Promise<boolean> {
+    try {
+      const preferences = await this.getUserPreferences(userId);
+      if (!preferences?.quiet_hours_enabled) {
+        return false;
+      }
 
-    if (startHour <= endHour) {
-      return currentHour >= startHour && currentHour < endHour;
-    } else {
-      // Handles overnight quiet hours (e.g., 22:00 - 08:00)
-      return currentHour >= startHour || currentHour < endHour;
+      const now = new Date();
+      const currentHour = now.getHours();
+      const startHour = preferences.quiet_hours_start || 22;
+      const endHour = preferences.quiet_hours_end || 8;
+
+      if (startHour <= endHour) {
+        return currentHour >= startHour && currentHour < endHour;
+      } else {
+        // Quiet hours span midnight
+        return currentHour >= startHour || currentHour < endHour;
+      }
+    } catch (error) {
+      console.error('Error checking quiet hours:', error);
+      return false;
     }
   }
 
   /**
-   * Send alert with user preferences check
+   * Send alert with user preferences
    */
   async sendAlertWithPreferences(
     userId: string,
@@ -402,33 +420,28 @@ export class WhatsAppClient {
   ): Promise<boolean> {
     try {
       // Check if WhatsApp is enabled
-      if (!(await this.isWhatsAppEnabled(userId))) {
+      const isEnabled = await this.isWhatsAppEnabled(userId);
+      if (!isEnabled) {
         console.log(`WhatsApp alerts disabled for user ${userId}`);
         return false;
       }
 
       // Check quiet hours
-      if (await this.isInQuietHours(userId)) {
-        console.log(`In quiet hours for user ${userId}`);
+      const inQuietHours = await this.isInQuietHours(userId);
+      if (inQuietHours) {
+        console.log(`User ${userId} is in quiet hours, skipping WhatsApp alert`);
         return false;
       }
 
-      // Get user preferences
+      // Get user's phone number
       const preferences = await this.getUserPreferences(userId);
       if (!preferences?.phone_number) {
-        console.error(`No phone number found for user ${userId}`);
-        return false;
-      }
-
-      // Check alert type preferences
-      const alertTypeKey = `alert_${alertType}`;
-      if (preferences[alertTypeKey] === false) {
-        console.log(`Alert type ${alertType} disabled for user ${userId}`);
+        console.log(`No phone number found for user ${userId}`);
         return false;
       }
 
       // Send the alert
-      return this.sendAlert(preferences.phone_number, alertType, alertData);
+      return await this.sendAlert(preferences.phone_number, alertType, alertData);
     } catch (error) {
       console.error('Error sending alert with preferences:', error);
       return false;
@@ -436,10 +449,10 @@ export class WhatsAppClient {
   }
 }
 
-// Export singleton instance
+// Create singleton instance
 export const whatsappClient = new WhatsAppClient();
 
-// Export helper functions
+// Export convenience functions
 export const sendWhatsAppAlert = (
   userId: string,
   alertType: keyof typeof ALERT_TEMPLATES,
