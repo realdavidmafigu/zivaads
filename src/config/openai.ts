@@ -1,5 +1,5 @@
 // OpenAI Configuration
-export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+export const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
 
 // For development/testing only - replace with real key in production
 export const OPENAI_CONFIG = {
