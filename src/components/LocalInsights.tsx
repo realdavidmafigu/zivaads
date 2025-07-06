@@ -112,10 +112,10 @@ export default function LocalInsights({ className = '' }: LocalInsightsProps) {
 
   if (loading) {
     return (
-      <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-6 ${className}`}>
-        <div className="flex items-center gap-3 mb-4">
-          <SparklesIcon className="h-6 w-6 text-purple-500" />
-          <h3 className="text-lg font-semibold text-gray-900">🧠 Local Insights</h3>
+      <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 ${className}`}>
+        <div className="flex items-center gap-2 sm:gap-3 mb-4">
+          <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">🧠 Local Insights</h3>
         </div>
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
@@ -130,10 +130,10 @@ export default function LocalInsights({ className = '' }: LocalInsightsProps) {
 
   if (error) {
     return (
-      <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-6 ${className}`}>
-        <div className="flex items-center gap-3 mb-4">
-          <SparklesIcon className="h-6 w-6 text-purple-500" />
-          <h3 className="text-lg font-semibold text-gray-900">🧠 Local Insights</h3>
+      <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 ${className}`}>
+        <div className="flex items-center gap-2 sm:gap-3 mb-4">
+          <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">🧠 Local Insights</h3>
         </div>
         <div className="text-center py-4">
           <ExclamationTriangleIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
@@ -150,19 +150,19 @@ export default function LocalInsights({ className = '' }: LocalInsightsProps) {
   }
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-6 ${className}`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <SparklesIcon className="h-6 w-6 text-purple-500" />
-          <h3 className="text-lg font-semibold text-gray-900">🧠 Local Insights</h3>
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 ${className}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500 flex-shrink-0" />
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">🧠 Local Insights</h3>
           <div className="flex items-center gap-1">
-            <CpuChipIcon className="h-4 w-4 text-green-500" />
+            <CpuChipIcon className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
             <span className="text-xs text-green-600 font-medium">AI Powered</span>
           </div>
         </div>
         <button
           onClick={fetchLocalInsights}
-          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          className="text-blue-600 hover:text-blue-800 text-sm font-medium self-start sm:self-auto"
         >
           Refresh
         </button>

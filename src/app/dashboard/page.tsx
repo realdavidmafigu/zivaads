@@ -444,9 +444,6 @@ export default function DashboardPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-
-
-
         {/* Permission Warning */}
         {permissionWarning && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
@@ -498,282 +495,294 @@ export default function DashboardPage() {
                   </select>
                 )}
               </div>
+              
               <div className="flex flex-col w-full sm:w-auto">
-                <label className="font-medium text-gray-700 mb-1">Period:</label>
+                <label className="font-medium text-gray-700 mb-1">Date Range:</label>
                 <select 
                   value={dateRange} 
                   onChange={e => setDateRange(e.target.value)} 
                   className="border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full"
                 >
-                  <option value="today">Today</option>
-                  <option value="yesterday">Yesterday</option>
                   <option value="last_7_days">Last 7 Days</option>
                   <option value="last_30_days">Last 30 Days</option>
+                  <option value="last_90_days">Last 90 Days</option>
                 </select>
               </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <label className="flex items-center space-x-2">
-                <input 
-                  type="checkbox" 
-                  checked={simpleMode} 
-                  onChange={e => setSimpleMode(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Simple Mode</span>
-              </label>
-              <div className="h-4 w-px bg-gray-300"></div>
-              <button
-                onClick={handleSyncFacebookData}
-                disabled={syncing}
-                className="flex items-center space-x-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                <ArrowPathIcon className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                <span>{syncing ? (syncProgress || 'Syncing...') : 'Sync Data'}</span>
-              </button>
-              <div className="h-4 w-px bg-gray-300"></div>
-              <button
-                onClick={() => router.push('/dashboard/connect-facebook')}
-                className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-              >
-                {hasFacebook ? 'Reconnect Facebook' : 'Connect Facebook'}
-              </button>
+              
+              <div className="flex flex-col w-full sm:w-auto">
+                <label className="font-medium text-gray-700 mb-1">View Mode:</label>
+                <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setSimpleMode(true)}
+                    className={`px-3 py-2 text-sm font-medium transition-colors ${
+                      simpleMode 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Simple
+                  </button>
+                  <button
+                    onClick={() => setSimpleMode(false)}
+                    className={`px-3 py-2 text-sm font-medium transition-colors ${
+                      !simpleMode 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Enhanced
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Spend</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {campaigns.length > 0 ? `$${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '--'}
+        {/* Connect Facebook Section - Moved to top */}
+        {!hasFacebook && (
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Connect Your Facebook Ads</h3>
+                <p className="text-gray-600 mb-4">
+                  Connect your Facebook advertising account to start monitoring your campaigns and get AI-powered insights.
                 </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => router.push('/dashboard/connect-facebook')}
+                    className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    Connect Facebook Account
+                  </button>
+                  <button
+                    onClick={handleSyncFacebookData}
+                    disabled={syncing}
+                    className="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ArrowPathIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                    {syncing ? (syncProgress || 'Syncing...') : 'Sync Data'}
+                  </button>
+                </div>
               </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <CurrencyDollarIcon className="w-5 h-5 text-white" />
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
-          
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Active Campaigns</p>
-                <p className="text-2xl font-bold text-gray-900">{activeCampaigns}</p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg flex items-center justify-center">
-                <ChartBarIcon className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
+        )}
 
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-                <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Clicks</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {campaigns.length > 0 ? totalClicks.toLocaleString() : '--'}
-                </p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <StatsCard
+            title="Total Spend"
+            value={`$${totalSpend.toFixed(2)}`}
+            icon={CurrencyDollarIcon}
+            color="from-green-600 to-emerald-600"
+          />
+          <StatsCard
+            title="Total Clicks"
+            value={totalClicks.toLocaleString()}
+            icon={CursorArrowRaysIcon}
+            color="from-purple-600 to-indigo-600"
+          />
+          <StatsCard
+            title="Total Impressions"
+            value={totalImpressions.toLocaleString()}
+            icon={EyeIcon}
+            color="from-blue-600 to-cyan-600"
+          />
+          <StatsCard
+            title="Active Campaigns"
+            value={activeCampaigns.toString()}
+            icon={ChartBarIcon}
+            color="from-orange-600 to-red-600"
+          />
+        </div>
+
+        {/* Local Insights - Full Width */}
+        <div className="mb-6">
+          <LocalInsights />
+        </div>
+
+        {/* Campaign Performance - Full Width */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-4 sm:px-6 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <ChartBarIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white flex-shrink-0" />
+                <h2 className="text-lg sm:text-xl font-bold text-white">Campaign Performance</h2>
               </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <CursorArrowRaysIcon className="w-5 h-5 text-white" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                <span className="px-2 sm:px-3 py-1 bg-white/20 text-white text-xs sm:text-sm font-medium rounded-full">
+                  {campaigns.length} Campaigns • Enhanced View
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSyncFacebookData}
+                    disabled={syncing}
+                    className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1 bg-white/20 text-white text-xs sm:text-sm font-medium rounded-full hover:bg-white/30 disabled:bg-white/10 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ArrowPathIcon className={`h-3 w-3 sm:h-4 sm:w-4 ${syncing ? 'animate-spin' : ''}`} />
+                    <span>{syncing ? (syncProgress || 'Syncing...') : 'Refresh'}</span>
+                  </button>
+                  <button
+                    onClick={() => router.push('/dashboard/campaigns')}
+                    className="px-2 sm:px-3 py-1 bg-white/20 text-white text-xs sm:text-sm font-medium rounded-full hover:bg-white/30 transition-colors"
+                  >
+                    View All
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+          <div className="p-6">
+            {campaignsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <div key={i} className="animate-pulse">
+                    <div className="h-64 bg-gray-200 rounded-xl"></div>
                   </div>
-                </div>
-          
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Performance</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {campaigns.length > 0 ? (activeCampaigns > 0 ? 'Good' : 'Needs Work') : 'Ready'}
-                </p>
+                ))}
               </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg flex items-center justify-center">
-                <SparklesIcon className="w-5 h-5 text-white" />
+            ) : campaigns.length === 0 ? (
+              <div className="text-center py-12">
+                <ChartBarIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
+                <p className="text-gray-600 mb-4">Connect your Facebook account to see your campaigns here.</p>
+                <button
+                  onClick={() => router.push('/dashboard/connect-facebook')}
+                  className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  <span>Connect Facebook</span>
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {campaigns.slice(0, 8).map((campaign) => (
+                  <EnhancedCampaignCard
+                    key={campaign.id}
+                    campaign={campaign}
+                    simpleMode={false}
+                  />
+                ))}
               </div>
-        </div>
-
-      {/* Local Insights - Full Width */}
-      <div className="mb-6">
-        <LocalInsights />
-      </div>
-
-      {/* Campaign Performance - Full Width */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <ChartBarIcon className="h-6 w-6 text-white" />
-              <h2 className="text-xl font-bold text-white">Campaign Performance</h2>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full">
-                {campaigns.length} Campaigns • Enhanced View
-              </span>
-              <button
-                onClick={handleSyncFacebookData}
-                disabled={syncing}
-                className="flex items-center space-x-2 px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full hover:bg-white/30 disabled:bg-white/10 disabled:cursor-not-allowed transition-colors"
-              >
-                <ArrowPathIcon className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                <span>{syncing ? (syncProgress || 'Syncing...') : 'Refresh'}</span>
-              </button>
-              <button
-                onClick={() => router.push('/dashboard/campaigns')}
-                className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full hover:bg-white/30 transition-colors"
-              >
-                View All
-              </button>
-            </div>
+            )}
           </div>
         </div>
-        <div className="p-6">
-          {campaignsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-64 bg-gray-200 rounded-xl"></div>
-                </div>
-              ))}
+
+        {/* Quick Actions & Insights Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Facebook Connection Status - Compact */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className={`px-4 py-3 ${hasFacebook ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}>
+              <div className="flex items-center space-x-2">
+                {hasFacebook ? (
+                  <CheckCircleIcon className="h-5 w-5 text-white" />
+                ) : (
+                  <ClockIcon className="h-5 w-5 text-white" />
+                )}
+                <h3 className="text-sm font-bold text-white">
+                  {hasFacebook ? 'Connected' : 'Connect'}
+                </h3>
+              </div>
             </div>
-          ) : campaigns.length === 0 ? (
-            <div className="text-center py-12">
-              <ChartBarIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
-              <p className="text-gray-600 mb-4">Connect your Facebook account to see your campaigns here.</p>
+            <div className="p-4">
+              <p className="text-xs text-gray-600 mb-3">
+                {hasFacebook 
+                  ? 'Facebook Business account connected'
+                  : 'Connect to start monitoring'
+                }
+              </p>
               <button
+                className="w-full bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                 onClick={() => router.push('/dashboard/connect-facebook')}
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                <PlusIcon className="h-4 w-4" />
-                <span>Connect Facebook</span>
+                {hasFacebook ? 'Manage' : 'Connect'}
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {campaigns.slice(0, 8).map((campaign) => (
-                <EnhancedCampaignCard
-                  key={campaign.id}
-                  campaign={campaign}
-                  simpleMode={false}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Quick Actions & Insights Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Facebook Connection Status - Compact */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className={`px-4 py-3 ${hasFacebook ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}>
-            <div className="flex items-center space-x-2">
-              {hasFacebook ? (
-                <CheckCircleIcon className="h-5 w-5 text-white" />
-              ) : (
-                <ClockIcon className="h-5 w-5 text-white" />
-              )}
-              <h3 className="text-sm font-bold text-white">
-                {hasFacebook ? 'Connected' : 'Connect'}
-              </h3>
+          {/* Recent AI Alerts - Compact */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center mb-3">
+              <ClockIcon className="h-5 w-5 text-blue-600 mr-2" />
+              <h3 className="text-sm font-semibold text-gray-900">AI Alerts</h3>
             </div>
+            {recentAIAlerts.length === 0 ? (
+              <div className="text-center py-2">
+                <BellIcon className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                <p className="text-xs text-gray-500">No alerts</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {recentAIAlerts.slice(0, 2).map((alert) => (
+                  <div key={alert.id} className="border border-gray-200 rounded-lg p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-lg">{alert.alert_type === 'morning' ? '🌅' : alert.alert_type === 'afternoon' ? '☀️' : alert.alert_type === 'evening' ? '🌙' : '📊'}</span>
+                      <span className="text-xs text-gray-500">{new Date(alert.generated_at).toLocaleString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    <p className="text-xs text-gray-700 line-clamp-2">{alert.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="p-4">
-            <p className="text-xs text-gray-600 mb-3">
-              {hasFacebook 
-                ? 'Facebook Business account connected'
-                : 'Connect to start monitoring'
-              }
-            </p>
-            <button
-              className="w-full bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              onClick={() => router.push('/dashboard/connect-facebook')}
-            >
-              {hasFacebook ? 'Manage' : 'Connect'}
-            </button>
-          </div>
-        </div>
 
-        {/* Recent AI Alerts - Compact */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center mb-3">
-            <ClockIcon className="h-5 w-5 text-blue-600 mr-2" />
-            <h3 className="text-sm font-semibold text-gray-900">AI Alerts</h3>
-          </div>
-          {recentAIAlerts.length === 0 ? (
-            <div className="text-center py-2">
-              <BellIcon className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-              <p className="text-xs text-gray-500">No alerts</p>
+          {/* Quick Stats */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center mb-3">
+              <SparklesIcon className="h-5 w-5 text-purple-600 mr-2" />
+              <h3 className="text-sm font-semibold text-gray-900">Quick Stats</h3>
             </div>
-          ) : (
             <div className="space-y-2">
-              {recentAIAlerts.slice(0, 2).map((alert) => (
-                <div key={alert.id} className="border border-gray-200 rounded-lg p-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-lg">{alert.alert_type === 'morning' ? '🌅' : alert.alert_type === 'afternoon' ? '☀️' : alert.alert_type === 'evening' ? '🌙' : '📊'}</span>
-                    <span className="text-xs text-gray-500">{new Date(alert.generated_at).toLocaleString('en-US', { month: 'short', day: 'numeric' })}</span>
-                  </div>
-                  <p className="text-xs text-gray-700 line-clamp-2">{alert.content}</p>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Active:</span>
+                <span className="font-semibold">{activeCampaigns}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Total Spend:</span>
+                <span className="font-semibold">${totalSpend.toFixed(0)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Total Clicks:</span>
+                <span className="font-semibold">{totalClicks.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Local Insights Preview - Compact */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center mb-3">
+              <SparklesIcon className="h-5 w-5 text-purple-600 mr-2" />
+              <h3 className="text-sm font-semibold text-gray-900">🧠 Local Insights</h3>
+            </div>
+            <div className="text-xs text-gray-600">
+              <p>ZESA outages, economic patterns, and local events affecting your ads</p>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center space-x-1">
+                  <span className="text-yellow-500">⚡</span>
+                  <span className="text-gray-700">Power status</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Quick Stats */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center mb-3">
-            <SparklesIcon className="h-5 w-5 text-purple-600 mr-2" />
-            <h3 className="text-sm font-semibold text-gray-900">Quick Stats</h3>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Active:</span>
-              <span className="font-semibold">{activeCampaigns}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Total Spend:</span>
-              <span className="font-semibold">${totalSpend.toFixed(0)}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Total Clicks:</span>
-              <span className="font-semibold">{totalClicks.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Local Insights Preview - Compact */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center mb-3">
-            <SparklesIcon className="h-5 w-5 text-purple-600 mr-2" />
-            <h3 className="text-sm font-semibold text-gray-900">🧠 Local Insights</h3>
-          </div>
-          <div className="text-xs text-gray-600">
-            <p>ZESA outages, economic patterns, and local events affecting your ads</p>
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center space-x-1">
-                <span className="text-yellow-500">⚡</span>
-                <span className="text-gray-700">Power status</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <span className="text-green-500">💰</span>
-                <span className="text-gray-700">Economic cycles</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <span className="text-blue-500">📅</span>
-                <span className="text-gray-700">Local events</span>
+                <div className="flex items-center space-x-1">
+                  <span className="text-green-500">💰</span>
+                  <span className="text-gray-700">Economic cycles</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span className="text-blue-500">📅</span>
+                  <span className="text-gray-700">Local events</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
       
       {/* API Call Monitor - only show in development */}
