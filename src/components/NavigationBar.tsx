@@ -34,12 +34,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">Z</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">ZivaAds</span>
-            </Link>
+            <img src="/logo.png" alt="ZivaAds Logo" className="h-20 w-auto max-w-md" />
           </div>
 
           {/* Desktop Navigation */}

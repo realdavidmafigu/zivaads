@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { FacebookCampaign, FacebookInsights } from '@/types';
 
@@ -6,6 +6,13 @@ interface EnhancedCampaignCardProps {
   campaign: FacebookCampaign;
   insights?: FacebookInsights;
   simpleMode?: boolean;
+}
+
+interface AIInsight {
+  performance: string;
+  recommendation: string;
+  action: string;
+  sentiment: 'positive' | 'neutral' | 'negative';
 }
 
 // Performance ribbon calculation
@@ -92,6 +99,11 @@ const EnhancedCampaignCard: React.FC<EnhancedCampaignCardProps> = ({ campaign, i
   const conversions = Number(campaign.conversions) || 0;
   const spent = Number(campaign.spend ?? insights?.spend) || 0;
   
+  // AI Insights state
+  const [aiInsight, setAiInsight] = useState<AIInsight | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  
   // Calculate derived values
   const performanceRibbon = getPerformanceRibbon(ctr, cpc);
   const campaignType = getCampaignType(campaign.objective || '');
@@ -103,6 +115,119 @@ const EnhancedCampaignCard: React.FC<EnhancedCampaignCardProps> = ({ campaign, i
   const hasPaymentIssue = campaign.facebook_account_id && 
     campaign.account_name && 
     campaign.payment_status === 'unsettled';
+
+  // Fetch AI insights
+  const fetchAIInsights = async () => {
+    if (simpleMode || aiLoading || aiInsight) return;
+    
+    setAiLoading(true);
+    setAiError(null);
+    
+    try {
+      const campaignData = {
+        name: campaign.name || 'Unknown Campaign',
+        status: campaign.status || 'UNKNOWN',
+        objective: campaign.objective || 'UNKNOWN',
+        spend: spent,
+        clicks: clicks,
+        impressions: impressions,
+        reach: reach,
+        frequency: frequency,
+        ctr: ctr,
+        cpc: cpc,
+        cpm: cpm,
+        daily_budget: Number(campaign.daily_budget) || 0
+      };
+
+      const response = await fetch('/api/ai-explain', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          metrics: {
+            singleCampaign: true,
+            campaignData: campaignData
+          },
+          campaigns: [campaignData]
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const aiResponse = data.insight || '';
+        
+        // Parse AI response to extract structured insights
+        const parsedInsight = parseAIResponse(aiResponse, campaignData);
+        setAiInsight(parsedInsight);
+      } else {
+        throw new Error('Failed to fetch AI insights');
+      }
+    } catch (error) {
+      console.error('Error fetching AI insights:', error);
+      setAiError('AI insights unavailable');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Parse AI response into structured format
+  const parseAIResponse = (aiResponse: string, campaignData: any): AIInsight => {
+    const response = aiResponse.toLowerCase();
+    
+    // Determine sentiment based on keywords
+    let sentiment: 'positive' | 'neutral' | 'negative' = 'neutral';
+    if (response.includes('excellent') || response.includes('great') || response.includes('good') || response.includes('well') || response.includes('strong')) {
+      sentiment = 'positive';
+    } else if (response.includes('problem') || response.includes('issue') || response.includes('low') || response.includes('poor') || response.includes('needs improvement')) {
+      sentiment = 'negative';
+    }
+    
+    // Parse structured response format
+    let performance = 'Campaign is running';
+    let recommendation = 'Monitor performance regularly';
+    let action = 'Continue optimizing';
+    
+    // Try to extract from structured format
+    const performanceMatch = aiResponse.match(/PERFORMANCE:\s*(.+?)(?=\n|RECOMMENDATION:|$)/i);
+    const recommendationMatch = aiResponse.match(/RECOMMENDATION:\s*(.+?)(?=\n|ACTION:|$)/i);
+    const actionMatch = aiResponse.match(/ACTION:\s*(.+?)(?=\n|$)/i);
+    
+    // Fallback: extract sentences if structured format fails
+    const sentences = aiResponse.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    
+    if (performanceMatch) {
+      performance = performanceMatch[1].trim();
+    } else if (sentences.length > 0) {
+      performance = sentences[0].trim();
+    }
+    
+    if (recommendationMatch) {
+      recommendation = recommendationMatch[1].trim();
+    } else if (sentences.length > 1) {
+      recommendation = sentences[1].trim();
+    }
+    
+    if (actionMatch) {
+      action = actionMatch[1].trim();
+    } else if (sentences.length > 2) {
+      action = sentences[2].trim();
+    }
+    
+    return {
+      performance: performance,
+      recommendation: recommendation,
+      action: action,
+      sentiment
+    };
+  };
+
+  // Fetch AI insights when component mounts (only once, and only for active campaigns)
+  useEffect(() => {
+    if (!simpleMode && !aiInsight && !aiLoading && campaign.status !== 'PAUSED') {
+      fetchAIInsights();
+    }
+  }, [simpleMode, aiInsight, aiLoading, campaign.status]);
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all duration-200 hover:shadow-md ${
@@ -203,53 +328,110 @@ const EnhancedCampaignCard: React.FC<EnhancedCampaignCardProps> = ({ campaign, i
           </div>
         </div>
 
-        {/* AI Insights - Simplified for Mobile */}
+        {/* Campaign Status Summary - Shows different content based on campaign status */}
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-700 mb-2">🔍 AI Insights</h4>
-          <div className="space-y-1 text-xs">
-            {ctr > 2 ? (
-              <div className="flex items-start space-x-1">
-                <span className="text-green-500">✓</span>
-                <span>Excellent CTR - People love your ad</span>
+          {campaign.status === 'PAUSED' ? (
+            <div>
+              <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center">
+                <span className="mr-1">⏸️</span>
+                Campaign Status
+              </h4>
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <span className="text-yellow-500 text-sm">⏸️</span>
+                  <div className="text-xs">
+                    <div className="font-medium text-yellow-800 mb-1">This ad is paused</div>
+                    {spent > 0 && clicks > 0 ? (
+                      <div className="text-yellow-700">
+                        When active, it was performing with {ctr > 0 ? `${ctr.toFixed(2)}%` : 'N/A'} click rate and ${cpc > 0 ? cpc.toFixed(2) : 'N/A'} cost per click.
+                      </div>
+                    ) : (
+                      <div className="text-yellow-700">
+                        No performance data available while paused.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            ) : ctr > 1 ? (
-              <div className="flex items-start space-x-1">
-                <span className="text-yellow-500">⚠</span>
-                <span>Good CTR - Test new creatives</span>
-              </div>
-            ) : (
-              <div className="flex items-start space-x-1">
-                <span className="text-red-500">✗</span>
-                <span>Low CTR - Try new image</span>
-              </div>
-            )}
-            
-            {cpc < 0.5 ? (
-              <div className="flex items-start space-x-1">
-                <span className="text-green-500">✓</span>
-                <span>Great CPC value</span>
-              </div>
-            ) : cpc < 1 ? (
-              <div className="flex items-start space-x-1">
-                <span className="text-yellow-500">⚠</span>
-                <span>Reasonable CPC</span>
-              </div>
-            ) : (
-              <div className="flex items-start space-x-1">
-                <span className="text-red-500">✗</span>
-                <span>High CPC - Review targeting</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Recommended Action */}
-        <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-700 mb-2">🎯 Action</h4>
-          <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-lg text-xs ${recommendedAction.color}`}>
-            <span>{recommendedAction.icon}</span>
-            <span className="font-medium">{recommendedAction.action}</span>
-          </div>
+            </div>
+          ) : (
+            <div>
+              <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center">
+                <span className="mr-1">🤖</span>
+                AI Review
+                {aiLoading && (
+                  <span className="ml-1 text-xs text-blue-500 animate-pulse">Loading...</span>
+                )}
+              </h4>
+              
+              {aiError ? (
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-start space-x-1">
+                    <span className="text-gray-500">⚠</span>
+                    <span className="text-gray-600">AI review temporarily unavailable</span>
+                  </div>
+                  {/* Fallback to basic insights */}
+                  {ctr > 2 ? (
+                    <div className="flex items-start space-x-1">
+                      <span className="text-green-500">✓</span>
+                      <span>Excellent CTR - People love your ad</span>
+                    </div>
+                  ) : ctr > 1 ? (
+                    <div className="flex items-start space-x-1">
+                      <span className="text-yellow-500">⚠</span>
+                      <span>Good CTR - Test new creatives</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-start space-x-1">
+                      <span className="text-red-500">✗</span>
+                      <span>Low CTR - Try new image</span>
+                    </div>
+                  )}
+                </div>
+              ) : aiInsight ? (
+                <div className="space-y-2 text-xs">
+                  <div className={`p-2 rounded-lg ${
+                    aiInsight.sentiment === 'positive' ? 'bg-green-50 border border-green-200' :
+                    aiInsight.sentiment === 'negative' ? 'bg-red-50 border border-red-200' :
+                    'bg-blue-50 border border-blue-200'
+                  }`}>
+                    <div className="flex items-start space-x-1 mb-1">
+                      <span className={`${
+                        aiInsight.sentiment === 'positive' ? 'text-green-500' :
+                        aiInsight.sentiment === 'negative' ? 'text-red-500' :
+                        'text-blue-500'
+                      }`}>
+                        {aiInsight.sentiment === 'positive' ? '✓' : 
+                         aiInsight.sentiment === 'negative' ? '✗' : '💡'}
+                      </span>
+                      <span className={`font-medium ${
+                        aiInsight.sentiment === 'positive' ? 'text-green-700' :
+                        aiInsight.sentiment === 'negative' ? 'text-red-700' :
+                        'text-blue-700'
+                      }`}>
+                        {aiInsight.performance}
+                      </span>
+                    </div>
+                    <div className="text-gray-600 ml-4">
+                      {aiInsight.recommendation}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-1">
+                    <span className="text-purple-500">🎯</span>
+                    <span className="text-gray-700">{aiInsight.action}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-start space-x-1">
+                    <span className="text-gray-400">⏳</span>
+                    <span className="text-gray-500">Analyzing campaign performance...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action Buttons - Mobile Responsive */}

@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
     let campaignsWithData = 0;
     let campaignsWithoutData = 0;
     let errors: string[] = [];
+    let campaignsToUpsert: any[] = [];
 
     // Process each account
     for (const account of accounts) {
@@ -79,31 +80,24 @@ export async function POST(request: NextRequest) {
 
         console.log(`📊 Found ${campaigns.length} campaigns for ${account.account_name}`);
 
-        // Process each campaign with simplified insights approach
+        // Process each campaign with optimized insights approach
         for (const campaign of campaigns) {
           try {
             totalCampaigns++;
             
-            // Try to get insights with a simple approach - just get whatever data is available
+            // OPTIMIZED: Use the new efficient getCampaignInsights method
             let insights = null;
             
             try {
-              // First try: Get insights without any date parameters (whatever is available)
-              const response = await facebookClient['makeRequest'](
-                `/${campaign.id}/insights`,
-                {
-                  fields: 'impressions,clicks,ctr,cpc,cpm,spend,reach,frequency,actions,action_values',
-                  limit: 1
-                }
-              ) as any;
+              // Single API call per campaign - much faster than the old 5-strategy approach
+              insights = await facebookClient.getCampaignInsights(campaign.id, 'last_30d');
               
-              if (response.data && response.data.length > 0) {
-                insights = response.data[0];
+              if (insights) {
                 console.log(`✅ Got insights for ${campaign.name}:`, {
                   impressions: insights.impressions,
                   clicks: insights.clicks,
                   spend: insights.spend,
-                  data_type: 'available_data'
+                  data_type: 'optimized_single_call'
                 });
                 campaignsWithData++;
               } else {
@@ -122,28 +116,86 @@ export async function POST(request: NextRequest) {
               campaignsWithoutData++;
             }
 
-            // Store campaign in database (with or without insights)
-            const { error: storeError } = await supabase
-              .from('campaigns')
-              .upsert({
-                user_id: user.id,
-                facebook_account_id: account.id,
-                facebook_campaign_id: campaign.id,
-                name: campaign.name,
-                status: campaign.status,
-                objective: campaign.objective,
-                created_time: campaign.created_time,
-                start_time: campaign.start_time,
-                stop_time: campaign.stop_time,
-                daily_budget: campaign.daily_budget,
-                lifetime_budget: campaign.lifetime_budget,
-                spend_cap: campaign.spend_cap,
-                special_ad_categories: campaign.special_ad_categories,
-                last_sync_at: new Date().toISOString()
-              }, { onConflict: 'facebook_account_id,facebook_campaign_id' });
+            // OPTIMIZED: Batch database operations instead of individual upserts
+            campaignsToUpsert.push({
+              user_id: user.id,
+              facebook_account_id: account.id,
+              facebook_campaign_id: campaign.id,
+              name: campaign.name,
+              status: campaign.status,
+              objective: campaign.objective,
+              created_time: campaign.created_time,
+              start_time: campaign.start_time,
+              stop_time: campaign.stop_time,
+              daily_budget: campaign.daily_budget,
+              lifetime_budget: campaign.lifetime_budget,
+              spend_cap: campaign.spend_cap,
+              special_ad_categories: campaign.special_ad_categories,
+              last_sync_at: new Date().toISOString()
+            });
 
-            if (storeError) {
-              console.error(`❌ Error storing campaign ${campaign.name}:`, storeError);
+            // Store insights if available
+            if (insights) {
+              try {
+                const now = new Date();
+                const currentHour = now.getHours();
+                const currentDate = now.toISOString().split('T')[0];
+
+                // Calculate additional metrics
+                let link_clicks = 0;
+                let whatsapp_clicks = 0;
+                let cpc_link = 0;
+                let cpc_whatsapp = 0;
+
+                if (insights.actions) {
+                  const linkClickAction = insights.actions.find((action: any) => action.action_type === 'link_click');
+                  if (linkClickAction && Number(linkClickAction.value) > 0) {
+                    link_clicks = Number(linkClickAction.value);
+                    cpc_link = Number(insights.spend) / link_clicks;
+                  }
+                  const waClickAction = insights.actions.find((action: any) => action.action_type === 'click_to_whatsapp');
+                  if (waClickAction && Number(waClickAction.value) > 0) {
+                    whatsapp_clicks = Number(waClickAction.value);
+                    cpc_whatsapp = Number(insights.spend) / whatsapp_clicks;
+                  }
+                }
+
+                // Get the campaign ID for metrics storage
+                const { data: campaignData } = await supabase
+                  .from('campaigns')
+                  .select('id')
+                  .eq('facebook_account_id', account.id)
+                  .eq('facebook_campaign_id', campaign.id)
+                  .single();
+
+                if (campaignData) {
+                  await supabase
+                    .from('campaign_metrics')
+                    .upsert({
+                      campaign_id: campaignData.id,
+                      metric_timestamp: now.toISOString(),
+                      metric_date: currentDate,
+                      metric_hour: currentHour,
+                      impressions: insights.impressions || 0,
+                      clicks: insights.clicks || 0,
+                      ctr: insights.ctr || 0,
+                      cpc: insights.cpc || 0,
+                      cpm: insights.cpm || 0,
+                      spend: insights.spend || 0,
+                      reach: insights.reach || 0,
+                      frequency: insights.frequency || 0,
+                      conversions: insights.actions?.find((action: any) => action.action_type === 'purchase')?.value || 0,
+                      link_clicks,
+                      whatsapp_clicks,
+                      cpc_link,
+                      cpc_whatsapp,
+                      data_source: 'facebook_api',
+                      is_latest: true
+                    }, { onConflict: 'campaign_id,metric_date,metric_hour' });
+                }
+              } catch (metricsError) {
+                console.error(`❌ Error storing metrics for campaign ${campaign.name}:`, metricsError);
+              }
             }
 
           } catch (campaignError) {
@@ -151,6 +203,22 @@ export async function POST(request: NextRequest) {
             const errorMessage = campaignError instanceof Error ? campaignError.message : 'Unknown error';
             errors.push(`Campaign ${campaign.name}: ${errorMessage}`);
           }
+        }
+
+        // OPTIMIZED: Batch upsert all campaigns for this account
+        if (campaignsToUpsert.length > 0) {
+          const { error: batchError } = await supabase
+            .from('campaigns')
+            .upsert(campaignsToUpsert, { onConflict: 'facebook_account_id,facebook_campaign_id' });
+
+          if (batchError) {
+            console.error(`❌ Error batch storing campaigns for account ${account.account_name}:`, batchError);
+          } else {
+            console.log(`✅ Successfully stored ${campaignsToUpsert.length} campaigns for account ${account.account_name}`);
+          }
+          
+          // Clear the batch for next account
+          campaignsToUpsert = [];
         }
 
         // Update account last sync time

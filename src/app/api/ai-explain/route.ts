@@ -36,42 +36,33 @@ export async function POST(req: NextRequest) {
     if (isSingleCampaign) {
       // Single campaign analysis
       const campaign = campaigns[0];
-      prompt = `You are a digital marketing coach for Zimbabwean businesses. Analyze this single Facebook ad campaign:
+      prompt = `Analyze this Facebook ad campaign for a Zimbabwean business owner:
 
-CAMPAIGN DETAILS:
+CAMPAIGN DATA:
 Name: ${campaign.name}
 Status: ${campaign.status}
 Objective: ${campaign.objective}
-How many people saw your ad: ${campaign.impressions?.toLocaleString() || 0}
-How many people clicked: ${campaign.clicks?.toLocaleString() || 0}
-How much you pay when someone clicks: $${campaign.cpc || 0}
-How much you pay to reach 1000 people: $${campaign.cpm || 0}
+People who saw your ad: ${campaign.impressions?.toLocaleString() || 0}
+People who clicked: ${campaign.clicks?.toLocaleString() || 0}
+Cost per click: $${campaign.cpc || 0}
+Cost to reach 1000 people: $${campaign.cpm || 0}
 Total spend: $${campaign.spend || 0}
-How many people you reached: ${campaign.reach?.toLocaleString() || 0}
-How often people see your ad: ${campaign.frequency || 0}
+People reached: ${campaign.reach?.toLocaleString() || 0}
+Times people see your ad: ${campaign.frequency || 0}
 
-Provide a brief, helpful analysis in plain language covering:
+Provide a concise analysis in this exact format:
 
-1. CAMPAIGN PERFORMANCE
-   - Is this campaign working well or needs improvement?
-   - What's the main strength or weakness?
+PERFORMANCE: [One sentence about how well the campaign is performing]
+RECOMMENDATION: [One specific action to improve performance]
+ACTION: [One immediate step they can take today]
 
-2. SPECIFIC INSIGHT
-   - One key thing the business owner should know about this campaign
-   - Why this matters for their business
-
-3. ACTIONABLE RECOMMENDATION
-   - One specific thing they can do to improve this campaign
-   - Keep it simple and practical
-
-IMPORTANT: 
-- Use ONLY plain English. NEVER use: CTR, CPC, CPM, frequency, impressions, reach, click-through rate, cost per click, cost per thousand impressions
-- Instead use: "how many people saw your ad", "how many people clicked", "how much you pay when someone clicks", "how much you pay to reach 1000 people", "how often people see your ad"
-- Write as if explaining to someone who has never run ads before
-- Keep your response brief (2-3 sentences maximum)
-- Focus on one main insight and one actionable recommendation
-- DO NOT use markdown formatting - use plain text only
-- Be encouraging and helpful, not technical`;
+IMPORTANT:
+- Use simple, non-technical language
+- Focus on practical, actionable advice
+- Consider the Zimbabwean market context
+- Be encouraging but honest about performance
+- Keep each section to one sentence maximum
+- Use plain English only, no marketing jargon`;
     } else {
       // Account-level analysis (existing logic)
       prompt = `You are a digital marketing coach for Zimbabwean businesses. Analyze this Facebook ad account performance:
@@ -136,12 +127,12 @@ DO NOT use markdown formatting like **bold** or ## headers - use plain text only
         'Authorization': `Bearer ${OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o', // Latest and most capable OpenAI model
         messages: [
-          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'system', content: 'You are a digital marketing expert specializing in Facebook advertising for Zimbabwean businesses. Provide clear, actionable insights in simple language.' },
           { role: 'user', content: prompt }
         ],
-        max_tokens: isSingleCampaign ? 300 : 1200,
+        max_tokens: isSingleCampaign ? 400 : 1500,
         temperature: 0.7
       })
     });

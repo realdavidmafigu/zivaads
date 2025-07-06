@@ -231,125 +231,67 @@ export class FacebookApiClient {
     }
   }
 
-  // Get campaign insights (performance metrics)
+  // Get campaign insights (performance metrics) - OPTIMIZED VERSION
   async getCampaignInsights(campaignId: string, dateRange: string = 'last_30d'): Promise<any> {
     try {
       const fields = 'impressions,clicks,ctr,cpc,cpm,spend,reach,frequency,actions,action_values';
       
-      // Strategy 1: Try with date_preset (most reliable for recent data)
-      try {
-        const response = await this.makeRequest<any>(
-          `/${campaignId}/insights`,
-          {
-            fields,
-            date_preset: 'last_30d',
-            limit: 1
-          }
-        );
-        
-        if (response.data && response.data.length > 0 && this.hasValidInsightsData(response.data[0])) {
-          console.log(`✅ Insights loaded for campaign ${campaignId} using date_preset`);
-          return response.data[0];
-        } else {
-          console.log(`⚠️ Date preset returned empty data for campaign ${campaignId}`);
-        }
-      } catch (error) {
-        console.log(`❌ Date preset approach failed for campaign ${campaignId}:`, error instanceof Error ? error.message : 'Unknown error');
+      // OPTIMIZED: Use a single, efficient strategy instead of trying 5 different approaches
+      // This reduces API calls from up to 5 per campaign to just 1 per campaign
+      
+      let params: Record<string, any> = {
+        fields,
+        limit: 1
+      };
+
+      // Add date parameters based on the requested range
+      if (dateRange === 'last_7d') {
+        params.date_preset = 'last_7d';
+      } else if (dateRange === 'last_90d') {
+        params.date_preset = 'last_90d';
+      } else if (dateRange === 'lifetime') {
+        // No date parameters for lifetime data
+      } else {
+        // Default to last_30d
+        params.date_preset = 'last_30d';
       }
 
-      // Strategy 2: Try with last 7 days (shorter period, more likely to have data)
-      try {
-        const response = await this.makeRequest<any>(
-          `/${campaignId}/insights`,
-          {
-            fields,
-            date_preset: 'last_7d',
-            limit: 1
-          }
-        );
+      const response = await this.makeRequest<any>(
+        `/${campaignId}/insights`,
+        params
+      );
+      
+      if (response.data && response.data.length > 0) {
+        const insights = response.data[0];
         
-        if (response.data && response.data.length > 0 && this.hasValidInsightsData(response.data[0])) {
-          console.log(`✅ Insights loaded for campaign ${campaignId} using last 7 days`);
-          return response.data[0];
+        // Check if we have meaningful data
+        if (this.hasValidInsightsData(insights)) {
+          console.log(`✅ Insights loaded for campaign ${campaignId} using ${dateRange}`);
+          return insights;
         } else {
-          console.log(`⚠️ Last 7 days returned empty data for campaign ${campaignId}`);
+          console.log(`⚠️ Campaign ${campaignId} has no meaningful insights data for ${dateRange}`);
+          return null;
         }
-      } catch (error) {
-        console.log(`❌ Last 7 days approach failed for campaign ${campaignId}:`, error instanceof Error ? error.message : 'Unknown error');
+      } else {
+        console.log(`⚠️ No insights data available for campaign ${campaignId} (${dateRange})`);
+        return null;
       }
 
-      // Strategy 3: Try with last 90 days (longer period for older campaigns)
-      try {
-        const response = await this.makeRequest<any>(
-          `/${campaignId}/insights`,
-          {
-            fields,
-            date_preset: 'last_90d',
-            limit: 1
-          }
-        );
-        
-        if (response.data && response.data.length > 0 && this.hasValidInsightsData(response.data[0])) {
-          console.log(`✅ Insights loaded for campaign ${campaignId} using last 90 days`);
-          return response.data[0];
-        } else {
-          console.log(`⚠️ Last 90 days returned empty data for campaign ${campaignId}`);
-        }
-      } catch (error) {
-        console.log(`❌ Last 90 days approach failed for campaign ${campaignId}:`, error instanceof Error ? error.message : 'Unknown error');
-      }
-
-      // Strategy 4: Try without any date parameters (lifetime data)
-      try {
-        const response = await this.makeRequest<any>(
-          `/${campaignId}/insights`,
-          {
-            fields,
-            limit: 1
-          }
-        );
-        
-        if (response.data && response.data.length > 0 && this.hasValidInsightsData(response.data[0])) {
-          console.log(`✅ Insights loaded for campaign ${campaignId} using lifetime data`);
-          return response.data[0];
-        } else {
-          console.log(`⚠️ Lifetime data returned empty data for campaign ${campaignId}`);
-        }
-      } catch (error) {
-        console.log(`❌ Lifetime data approach failed for campaign ${campaignId}:`, error instanceof Error ? error.message : 'Unknown error');
-      }
-
-      // Strategy 5: Try with custom date range (last 30 days)
-      try {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const response = await this.makeRequest<any>(
-          `/${campaignId}/insights`,
-          {
-            fields,
-            time_range: JSON.stringify({
-              since: thirtyDaysAgo.toISOString().split('T')[0],
-              until: 'today'
-            }),
-            limit: 1
-          }
-        );
-        
-        if (response.data && response.data.length > 0 && this.hasValidInsightsData(response.data[0])) {
-          console.log(`✅ Insights loaded for campaign ${campaignId} using custom date range`);
-          return response.data[0];
-        } else {
-          console.log(`⚠️ Custom date range returned empty data for campaign ${campaignId}`);
-        }
-      } catch (error) {
-        console.log(`❌ Custom date range approach failed for campaign ${campaignId}:`, error instanceof Error ? error.message : 'Unknown error');
-      }
-
-      console.log(`All insights approaches failed for campaign ${campaignId}`);
-      return null;
     } catch (error) {
-      console.error('Error fetching campaign insights:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Handle specific Facebook API errors gracefully
+      if (errorMessage.includes('(#100)')) {
+        console.log(`📊 No insights data available for campaign ${campaignId} - campaign may have no activity`);
+        return null;
+      }
+      
+      if (errorMessage.includes('permission') || errorMessage.includes('(#100)')) {
+        console.log(`🚫 Permission issue for campaign ${campaignId} - skipping insights`);
+        return null;
+      }
+      
+      console.error(`❌ Error fetching insights for campaign ${campaignId}:`, errorMessage);
       return null;
     }
   }

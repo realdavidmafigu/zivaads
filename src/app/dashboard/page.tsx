@@ -599,6 +599,11 @@ export default function DashboardPage() {
               </div>
         </div>
 
+      {/* Local Insights - Full Width */}
+      <div className="mb-6">
+        <LocalInsights />
+      </div>
+
       {/* Campaign Performance - Full Width */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
@@ -744,17 +749,28 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Local Market Insights - Compact */}
+        {/* Local Insights Preview - Compact */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center mb-3">
-            <EyeIcon className="h-5 w-5 text-green-600 mr-2" />
-            <h3 className="text-sm font-semibold text-gray-900">Market Insights</h3>
+            <SparklesIcon className="h-5 w-5 text-purple-600 mr-2" />
+            <h3 className="text-sm font-semibold text-gray-900">🧠 Local Insights</h3>
           </div>
           <div className="text-xs text-gray-600">
-            <p>Local market trends and competitor analysis</p>
-            <button className="mt-2 text-blue-600 hover:text-blue-700 font-medium">
-              View Details →
-            </button>
+            <p>ZESA outages, economic patterns, and local events affecting your ads</p>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center space-x-1">
+                <span className="text-yellow-500">⚡</span>
+                <span className="text-gray-700">Power status</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <span className="text-green-500">💰</span>
+                <span className="text-gray-700">Economic cycles</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <span className="text-blue-500">📅</span>
+                <span className="text-gray-700">Local events</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ExclamationTriangleIcon, InformationCircleIcon, CheckCircleIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, InformationCircleIcon, CheckCircleIcon, SparklesIcon, CpuChipIcon } from '@heroicons/react/24/outline';
 
 interface LocalInsight {
   id: string;
@@ -23,6 +23,7 @@ export default function LocalInsights({ className = '' }: LocalInsightsProps) {
   const [insights, setInsights] = useState<LocalInsight[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAIPowered, setIsAIPowered] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetchLocalInsights();
@@ -32,18 +33,33 @@ export default function LocalInsights({ className = '' }: LocalInsightsProps) {
     try {
       setLoading(true);
       setError(null);
+      setIsAIPowered(null);
       
       const response = await fetch('/api/local-insights');
       const data = await response.json();
       
       if (data.success) {
         setInsights(data.insights || []);
+        
+        // Always AI-powered now
+        setIsAIPowered(true);
+        
+        console.log('🧠 AI-powered local insights loaded:', {
+          count: data.insights?.length || 0,
+          aiPowered: data.aiPowered,
+          generatedAt: data.generatedAt
+        });
       } else {
-        setError('Failed to load local insights');
+        // Handle AI-specific errors
+        if (response.status === 503) {
+          setError('AI service temporarily unavailable. Please check your OpenAI API configuration.');
+        } else {
+          setError(data.error || 'Failed to load AI insights');
+        }
       }
     } catch (err) {
-      console.error('Error fetching local insights:', err);
-      setError('Unable to load local insights');
+      console.error('Error fetching AI local insights:', err);
+      setError('Unable to load AI insights. Please check your connection and OpenAI API configuration.');
     } finally {
       setLoading(false);
     }
@@ -139,6 +155,10 @@ export default function LocalInsights({ className = '' }: LocalInsightsProps) {
         <div className="flex items-center gap-3">
           <SparklesIcon className="h-6 w-6 text-purple-500" />
           <h3 className="text-lg font-semibold text-gray-900">🧠 Local Insights</h3>
+          <div className="flex items-center gap-1">
+            <CpuChipIcon className="h-4 w-4 text-green-500" />
+            <span className="text-xs text-green-600 font-medium">AI Powered</span>
+          </div>
         </div>
         <button
           onClick={fetchLocalInsights}
@@ -189,7 +209,7 @@ export default function LocalInsights({ className = '' }: LocalInsightsProps) {
       
       <div className="mt-4 pt-3 border-t border-gray-100">
         <p className="text-xs text-gray-500 text-center">
-          Insights based on local Zimbabwean factors like power outages, economic cycles, and social behavior
+          AI-powered insights analyzing your campaign performance in Zimbabwean context
         </p>
       </div>
     </div>
