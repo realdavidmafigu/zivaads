@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       {
         method: 'POST',
         headers: {
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloY21hemJpYmd3bXZhenV4Z2NsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTM3NTAyMSwiZXhwIjoyMDY2OTUxMDIxfQ.YTeTK-Xs2_h6e2fQzmlWXjxCJf4fLYXNzThMXYiA1CI',
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SERVICE_ROLE_KEY'}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

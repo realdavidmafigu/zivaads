@@ -8,7 +8,7 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url := 'https://yhcmazbibgwmvazuxgcl.supabase.co/functions/v1/sync-facebook-campaigns',
-    headers := '{"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloY21hemJpYmd3bXZhenV4Z2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI5NzAsImV4cCI6MjA1MDU0ODk3MH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8", "Content-Type": "application/json"}'::jsonb
+    headers := '{"Authorization": "Bearer YOUR_SUPABASE_ANON_KEY", "Content-Type": "application/json"}'::jsonb
   );
   $$
 );
@@ -20,7 +20,7 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url := 'https://yhcmazbibgwmvazuxgcl.supabase.co/functions/v1/generate-ai-alerts',
-    headers := '{"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloY21hemJpYmd3bXZhenV4Z2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI5NzAsImV4cCI6MjA1MDU0ODk3MH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8", "Content-Type": "application/json"}'::jsonb
+    headers := '{"Authorization": "Bearer YOUR_SUPABASE_ANON_KEY", "Content-Type": "application/json"}'::jsonb
   );
   $$
 );
@@ -31,7 +31,7 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url := 'https://yhcmazbibgwmvazuxgcl.supabase.co/functions/v1/generate-ai-alerts',
-    headers := '{"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloY21hemJpYmd3bXZhenV4Z2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI5NzAsImV4cCI6MjA1MDU0ODk3MH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8", "Content-Type": "application/json"}'::jsonb
+    headers := '{"Authorization": "Bearer YOUR_SUPABASE_ANON_KEY", "Content-Type": "application/json"}'::jsonb
   );
   $$
 );
@@ -42,7 +42,7 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url := 'https://yhcmazbibgwmvazuxgcl.supabase.co/functions/v1/generate-ai-alerts',
-    headers := '{"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloY21hemJpYmd3bXZhenV4Z2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI5NzAsImV4cCI6MjA1MDU0ODk3MH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8", "Content-Type": "application/json"}'::jsonb
+    headers := '{"Authorization": "Bearer YOUR_SUPABASE_ANON_KEY", "Content-Type": "application/json"}'::jsonb
   );
   $$
 );
