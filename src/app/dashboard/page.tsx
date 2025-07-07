@@ -172,8 +172,21 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserName(user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User');
-        const fbConnected = await hasFacebookConnection(user.id);
-        setHasFacebook(fbConnected);
+        
+        // Check for Facebook connection using server-side API
+        try {
+          const res = await fetch('/api/facebook/connection-status');
+          const data = await res.json();
+          
+          if (res.ok) {
+            setHasFacebook(data.hasConnection);
+          } else {
+            setHasFacebook(false);
+          }
+        } catch (err) {
+          console.log('❌ Error calling connection status API:', err);
+          setHasFacebook(false);
+        }
       }
       setLoading(false);
     }
@@ -539,70 +552,82 @@ export default function DashboardPage() {
         </div>
 
         {/* Connect Facebook Section - Moved to top */}
-        {!hasFacebook && (
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Connect Your Facebook Ads</h3>
-                <p className="text-gray-600 mb-4">
-                  Connect your Facebook advertising account to start monitoring your campaigns and get AI-powered insights.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={() => router.push('/dashboard/connect-facebook')}
-                    className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                    </svg>
-                    Connect Facebook Account
-                  </button>
-                  <button
-                    onClick={handleSyncFacebookData}
-                    disabled={syncing}
-                    className="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ArrowPathIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                    {syncing ? (syncProgress || 'Syncing...') : 'Sync Data'}
-                  </button>
-                </div>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+        <div className={`rounded-xl p-6 mb-8 ${hasFacebook ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200' : 'bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {hasFacebook ? 'Facebook Ads Connected' : 'Connect Your Facebook Ads'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {hasFacebook 
+                  ? 'Your Facebook advertising account is connected and ready for monitoring campaigns and AI-powered insights.'
+                  : 'Connect your Facebook advertising account to start monitoring your campaigns and get AI-powered insights.'
+                }
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => router.push('/dashboard/connect-facebook')}
+                  className={`inline-flex items-center justify-center px-4 py-2 rounded-lg transition-colors font-medium ${
+                    hasFacebook 
+                      ? 'bg-green-600 text-white hover:bg-green-700' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
-                </div>
+                  {hasFacebook ? 'Manage Facebook Account' : 'Connect Facebook Account'}
+                </button>
+                <button
+                  onClick={handleSyncFacebookData}
+                  disabled={syncing}
+                  className="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ArrowPathIcon className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? (syncProgress || 'Syncing...') : 'Sync Data'}
+                </button>
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                hasFacebook 
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
+                  : 'bg-gradient-to-r from-blue-600 to-purple-600'
+              }`}>
+                <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
               </div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatsCard
             title="Total Spend"
-            value={`$${totalSpend.toFixed(2)}`}
-            icon={CurrencyDollarIcon}
-            color="from-green-600 to-emerald-600"
+            value={totalSpend}
+            icon={<CurrencyDollarIcon className="h-5 w-5" />}
+            color="green"
+            isCurrency={true}
           />
           <StatsCard
             title="Total Clicks"
-            value={totalClicks.toLocaleString()}
-            icon={CursorArrowRaysIcon}
-            color="from-purple-600 to-indigo-600"
+            value={totalClicks}
+            icon={<CursorArrowRaysIcon className="h-5 w-5" />}
+            color="purple"
           />
           <StatsCard
             title="Total Impressions"
-            value={totalImpressions.toLocaleString()}
-            icon={EyeIcon}
-            color="from-blue-600 to-cyan-600"
+            value={totalImpressions}
+            icon={<EyeIcon className="h-5 w-5" />}
+            color="blue"
           />
           <StatsCard
             title="Active Campaigns"
-            value={activeCampaigns.toString()}
-            icon={ChartBarIcon}
-            color="from-orange-600 to-red-600"
+            value={activeCampaigns}
+            icon={<ChartBarIcon className="h-5 w-5" />}
+            color="red"
           />
         </div>
 
@@ -679,37 +704,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions & Insights Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Facebook Connection Status - Compact */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className={`px-4 py-3 ${hasFacebook ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}>
-              <div className="flex items-center space-x-2">
-                {hasFacebook ? (
-                  <CheckCircleIcon className="h-5 w-5 text-white" />
-                ) : (
-                  <ClockIcon className="h-5 w-5 text-white" />
-                )}
-                <h3 className="text-sm font-bold text-white">
-                  {hasFacebook ? 'Connected' : 'Connect'}
-                </h3>
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-xs text-gray-600 mb-3">
-                {hasFacebook 
-                  ? 'Facebook Business account connected'
-                  : 'Connect to start monitoring'
-                }
-              </p>
-              <button
-                className="w-full bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                onClick={() => router.push('/dashboard/connect-facebook')}
-              >
-                {hasFacebook ? 'Manage' : 'Connect'}
-              </button>
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent AI Alerts - Compact */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-center mb-3">

@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config/supabase';
 
+// Browser client for client-side operations
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Check if user has connected Facebook accounts

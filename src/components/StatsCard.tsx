@@ -11,6 +11,7 @@ interface StatsCardProps {
   color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple';
   loading?: boolean;
   description?: string;
+  isCurrency?: boolean;
 }
 
 export default function StatsCard({ 
@@ -20,7 +21,8 @@ export default function StatsCard({
   icon, 
   color = 'blue',
   loading = false,
-  description
+  description,
+  isCurrency = false
 }: StatsCardProps) {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-600 border-blue-200',
@@ -64,9 +66,9 @@ export default function StatsCard({
           </div>
           <p className="text-3xl font-bold text-gray-900 mb-2">
             {typeof value === 'number' && value >= 1000 
-              ? `$${(value / 1000).toFixed(1)}k` 
+              ? `${isCurrency ? '$' : ''}${(value / 1000).toFixed(1)}k` 
               : typeof value === 'number' 
-                ? `$${value.toLocaleString()}` 
+                ? `${isCurrency ? '$' : ''}${value.toLocaleString()}` 
                 : value
             }
           </p>
